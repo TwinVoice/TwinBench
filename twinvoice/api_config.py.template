@@ -1,0 +1,7 @@
+# API configuration
+# Rename this file to api_config.py and fill in your API key
+
+# OpenAI API key
+api_key = "YOUR_API_KEY_HERE"
+
+# Add other API configurations below if needed
