@@ -71,13 +71,32 @@ python -m twinvoice.discriminative.dimension_3.evaluate \
 - Persona_Tone（人物语气）
 - Syntactic_Style（句法风格）
 
+### 配置说明
+
+1. 复制示例配置文件：
+```bash
+cp twinvoice/api_config.example.py twinvoice/api_config.py
+```
+
+2. 编辑 `twinvoice/api_config.py` 配置您的API密钥：
+```python
+# SVIP API配置
+api_key = 'your-api-key-here'  # 替换为您的API密钥
+svip_base_url = 'https://svip.xty.app/v1'
+
+# 本地API配置
+local_base_url = 'http://localhost:8005/v1'  # 如果使用其他端口，请修改
+local_api_key = 'EMPTY'
+```
+
 ### 注意事项
 
 1. 确保在项目根目录下运行评测命令
-2. 运行前确保已正确配置 API 密钥（在 `twinvoice/api_config.py` 中）
+2. 运行前确保已正确配置 API 密钥（复制并修改 `api_config.example.py`）
 3. 本地模型评测需要启动本地服务器（默认端口8005）
 4. 评测过程支持优雅退出（Ctrl+C）
 5. 建议先使用小样本测试配置是否正确
+6. 不要提交 `api_config.py` 到版本控制系统
 
 ## 输出说明
 

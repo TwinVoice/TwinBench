@@ -1,7 +1,7 @@
-# API configuration
-# Rename this file to api_config.py and fill in your API key
+# SVIP API配置
+api_key = 'your-api-key-here'
+svip_base_url = ''
 
-# OpenAI API key
-api_key = "YOUR_API_KEY_HERE"
-
-# Add other API configurations below if needed
+# 本地API配置
+local_base_url = ''
+local_api_key = 'EMPTY'
