@@ -5,3 +5,5 @@ svip_base_url = ''
 # 本地API配置
 local_base_url = ''
 local_api_key = 'EMPTY'
+
+# 可能改成以 twin model 和 judge model两个api分类更好，待更新
