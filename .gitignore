@@ -28,7 +28,7 @@ wheels/
 .env.*.local
 *.pem
 credentials.json
-TwinVoice_Evaluation/api_config.py
+twinvoice/api_config.py
 
 # IDE
 .idea/
