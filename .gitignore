@@ -22,7 +22,7 @@ wheels/
 .installed.cfg
 *.egg
 
-# 环境变量和密钥
+# Environment Variables and Secrets
 .env
 .env.local
 .env.*.local
@@ -30,12 +30,17 @@ wheels/
 credentials.json
 twinvoice/api_config.py
 
-# IDE
+# IDEs
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# 操作系统
+# Operating System
 .DS_Store
 Thumbs.db
+
+# Local Documentation
+README.local.md
+
+
