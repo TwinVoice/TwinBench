@@ -26,19 +26,7 @@
 ### 基础评测
 
 ```bash
-python evaluate.py ../../../../Dataset/dimension_3/choices.jsonl ../../../../Dataset/dimension_3/profiles.json \
-    --model gpt-4o-mini \
-    --report results.jsonl
-```
-
-### 带能力维度分析的评测
-
-```bash
-python evaluate.py ../../../../Dataset/dimension_3/choices.jsonl ../../../../Dataset/dimension_3/profiles.json \
-    --model gpt-4o-mini \
-    --report results.jsonl \
-    --annotations annotated.jsonl \
-    --cap-report-csv caps.csv
+python twinvoice/discriminative/dimension_3/evaluate.py dataset/dimension_3/choices.jsonl dataset/dimension_3/profiles.jsonl --model '/common/users/mg1998/models/Qwen2.5-14B-Instruct' --sample 5 --report result/discriminative/dimension_3/results_test.jsonl --temperature 0.0
 ```
 
 ### 主要参数说明

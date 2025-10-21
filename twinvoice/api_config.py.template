@@ -1,9 +1,8 @@
-# SVIP API配置
-api_key = 'your-api-key-here'
-svip_base_url = ''
+# API configuration for digital twin model
+twin_base_url = ''
+twin_api_key = ''
 
-# 本地API配置
-local_base_url = ''
-local_api_key = 'EMPTY'
+# API configuration for LLM-as-a-judge model
+judge_base_url = ''
+judge_api_key = ''
 
-# 可能改成以 twin model 和 judge model两个api分类更好，待更新

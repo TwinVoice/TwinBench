@@ -3,25 +3,18 @@ import json, argparse, random, re, signal, os
 from collections import defaultdict
 import pandas as pd
 from openai import OpenAI
-from twinvoice.api_config import api_key, svip_base_url, local_base_url, local_api_key
+from twinvoice.api_config import twin_base_url, twin_api_key
 
-# --- Custom API configuration ---
-LOCAL_MODEL_KEYWORDS = ["qwen", "llama", "mistral", "mixtral", "yi", "gemma", "phi"]
-
+# --- API configuration ---
+# Discriminative task only uses Digital Twin API
 def get_client(model_name=None):
-    """根据模型名称返回对应的client配置"""
-    if model_name and any(kw.lower() in model_name.lower() for kw in LOCAL_MODEL_KEYWORDS):
-        return OpenAI(
-            base_url=local_base_url,
-            api_key=local_api_key
-        )
-    else:  # SVIP API
-        return OpenAI(
-            base_url=svip_base_url,
-            api_key=api_key
-        )
+    """Return Digital Twin API client configuration"""
+    return OpenAI(
+        base_url=twin_base_url,
+        api_key=twin_api_key
+    )
 
-# 默认使用SVIP API
+# Default client uses Digital Twin API
 client = get_client()
 
 def load_json(path):
@@ -33,7 +26,7 @@ def save_json(path, data):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 def chat(model, prompt, *, stream=False, verbose=False, json_mode=True, temperature=0.2, timeout=30):
-    # 根据模型名称获取对应的client
+    # Use Digital Twin API client
     current_client = get_client(model)
     
     messages = [{"role": "user", "content": prompt}]
@@ -45,10 +38,10 @@ def chat(model, prompt, *, stream=False, verbose=False, json_mode=True, temperat
         "timeout": timeout,
     }
     
-    # 只对非本地模型启用json_mode
-    is_local = any(kw.lower() in str(model).lower() for kw in LOCAL_MODEL_KEYWORDS)
-    if json_mode and not is_local:
-        kwargs["response_format"] = {"type": "json_object"}
+    # Digital Twin models generally don't support json_mode, use regex parsing instead
+    # Can be manually enabled if the model supports json_mode
+    # if json_mode:
+    #     kwargs["response_format"] = {"type": "json_object"}
 
     if stream:
         words = []
@@ -71,7 +64,7 @@ def _handle_sigint(signum, frame):
     STOP = True
     print("safe exit")
 
-# =============== Prompt（含历史）===============
+# =============== Prompt (with history) ===============
 EVAL_PROMPT = """You are a careful reading-comprehension evaluator.
 You are given ONLY:
 - speaker name,
@@ -104,7 +97,7 @@ C) {optC}
 D) {optD}
 """
 
-# =============== Profile/History 工具 ===============
+# =============== Profile/History Utilities ===============
 def load_profiles(path):
     data = json.load(open(path, encoding="utf-8"))
     profiles = {}
@@ -205,12 +198,13 @@ def format_history(items, max_items=12):
         buf.append(f"- [chunk {cid}] {txt}")
     return "\n".join(buf)
 
-# =============== 评测（模型答题）===============
+# =============== Evaluation (Model Response) ===============
 def evaluate_mcq_only(choices_path, profile_path, model, sample_n=None, report_path=None, wrong_report_path=None,
                       temperature=0.0, history_max=12):
     """
-    读 choices.jsonl，结合 profile.json 的历史与人物设定，构造 Prompt 让模型在 A/B/C/D 里选一项。
-    返回 DataFrame，并可将逐条结果写到 report_path(JSONL) 供后续 --reuse-report 复用。
+    Read choices.jsonl, combine with profile.json's history and character settings,
+    construct Prompt to let the model choose one from A/B/C/D.
+    Returns DataFrame, and can write results to report_path(JSONL) for later --reuse-report.
     """
     global STOP
     
@@ -281,7 +275,7 @@ def evaluate_mcq_only(choices_path, profile_path, model, sample_n=None, report_p
         if ok: correct += 1
 
         rec = {
-            "chunk_id": str(chunk_id) if chunk_id is not None else None,  # 统一为 str
+            "chunk_id": str(chunk_id) if chunk_id is not None else None,  # Convert to str
             "speaker": spk,
             "choice": choice,
             "choice_text": choice_text,
@@ -315,7 +309,7 @@ def evaluate_mcq_only(choices_path, profile_path, model, sample_n=None, report_p
 
     return pd.DataFrame(results)
 
-# =============== 读取复用/标注 ===============
+# =============== Load Reused Reports/Annotations ===============
 def load_eval_report(path):
     rows = [json.loads(l) for l in open(path,encoding="utf-8") if l.strip()]
     df = pd.DataFrame(rows)
@@ -344,11 +338,11 @@ def load_annotations(path):
         df["chunk_id"] = df["chunk_id"].astype(str)
     return df
 
-# =============== 只做“按能力标志”的准确率报表 ===============
+# =============== Capability-based Accuracy Report ===============
 def compute_required_cap_accuracy(eval_df: pd.DataFrame, ann_df: pd.DataFrame):
     """
-    合并 eval 与 annotations，按每个能力列（True 的子集）计算准确率。
-    返回 DataFrame: [capability, n, acc(%)]
+    Merge eval with annotations, compute accuracy for each capability column (subset where True).
+    Returns DataFrame: [capability, n, acc(%)]
     """
     M = eval_df.merge(ann_df, on="chunk_id", how="inner").copy()
     rows = []
@@ -375,7 +369,7 @@ def main():
     ap.add_argument("choices_jsonl", default="dataset/dimension_3/choices.jsonl", help="Path to choices data file")
     ap.add_argument("profile_json", default="dataset/dimension_3/profiles.jsonl", help="Path to profile data file")
 
-    # Step 1：评测
+    # Step 1: Evaluation
     ap.add_argument("--model", default="gpt-4o-mini", help="Model name to use for evaluation")
     ap.add_argument("--sample", type=int, help="Number of samples to evaluate (optional)")
     ap.add_argument("--report", default="result/discriminative/dimension_3/results.jsonl", help="Path to save evaluation results (JSONL format)")
@@ -384,13 +378,13 @@ def main():
     ap.add_argument("--history-max", type=int, default=30, help="Maximum number of history items to include")
     ap.add_argument("--cap-report-csv", default="result/discriminative/dimension_3/capability_report.csv", help="Path to save capability analysis report (CSV format)")
 
-    # Step 2：复用 + 能力统计（只做 required-cap）
-    ap.add_argument("--reuse-report", action="store_true", help="不重新评测，复用 --report 的 JSONL")
-    ap.add_argument("--annotations", help="能力标注 JSONL（annotated_by_*.jsonl）")
+    # Step 2: Reuse + Capability statistics (required-cap only)
+    ap.add_argument("--reuse-report", action="store_true", help="Don't re-evaluate, reuse JSONL from --report")
+    ap.add_argument("--annotations", help="Capability annotation JSONL (annotated_by_*.jsonl)")
 
     args = ap.parse_args()
 
-    # 选择 eval_df 来源
+    # Select eval_df source
     if args.reuse_report:
         if not args.report:
             raise ValueError("When using --reuse-report, you must also provide --report <path-to-jsonl>.")
@@ -409,11 +403,11 @@ def main():
         )
         print(f"[Info] Fresh evaluation rows: {len(eval_df)}")
 
-    # 只有评测也可以直接结束
+    # Can end here if only doing evaluation
     if not args.annotations:
         return
 
-    # 加载能力标注并统计
+    # Load capability annotations and compute statistics
     try:
         print_section("Loading Annotations", "-")
         print(f"Loading annotations from {args.annotations}...")
