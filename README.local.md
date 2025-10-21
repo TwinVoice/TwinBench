@@ -51,6 +51,69 @@ python twinvoice/discriminative/dimension_2/evaluate.py \
     --history-max 30
 ```
 
+## Dimension 2评测命令
+
+### 1. 判别式评测（User Style Matching）
+
+```bash
+# 测试运行（5个样本）
+python twinvoice/discriminative/dimension_2/evaluate.py \
+    --input dataset/dimension_2/conversation_data.jsonl \
+    --model '/common/users/mg1998/models/Qwen2.5-14B-Instruct' \
+    --sample 5 \
+    --report result/discriminative/dimension_2/results_test.jsonl \
+    --temperature 0.0 \
+    --history-max 30
+
+# 完整评测
+python twinvoice/discriminative/dimension_2/evaluate.py \
+    --input dataset/dimension_2/conversation_data.jsonl \
+    --model '/common/users/mg1998/models/Qwen2.5-14B-Instruct' \
+    --report result/discriminative/dimension_2/results.jsonl \
+    --wrong-report result/discriminative/dimension_2/wrong_cases.jsonl \
+    --temperature 0.0 \
+    --history-max 30
+```
+
+### 2. 生成式评测
+
+#### Step 1: 生成回复
+```bash
+# 测试运行（5个样本）
+python twinvoice/generative/Dimension_2/gen_step1.py \
+    --input dataset/dimension_2/conversation_data.jsonl \
+    --gen_model '/common/users/mg1998/models/Qwen2.5-14B-Instruct' \
+    --out_dir result/generative/dimension_2 \
+    --workers 8 \
+    --sample 5 \
+    --temperature 0.0
+
+# 完整运行
+python twinvoice/generative/Dimension_2/gen_step1.py \
+    --input dataset/dimension_2/conversation_data.jsonl \
+    --gen_model '/common/users/mg1998/models/Qwen2.5-14B-Instruct' \
+    --out_dir result/generative/dimension_2 \
+    --workers 8 \
+    --temperature 0.0
+```
+
+#### Step 2: 评判生成质量
+```bash
+# 测试运行的评判
+python twinvoice/generative/Dimension_2/judge_step2.py \
+    --input result/generative/dimension_2/step1_generations_Qwen2.5-14B-Instruct.jsonl \
+    --judge_model gpt-5-chat \
+    --workers 8 \
+    --temperature 0.0
+
+# 完整运行的评判
+python twinvoice/generative/Dimension_2/judge_step2.py \
+    --input result/generative/dimension_2/step1_generations_Qwen2.5-14B-Instruct.jsonl \
+    --judge_model gpt-5-chat \
+    --workers 8 \
+    --temperature 0.0
+```
+
 ## Dimension 3评测命令
 
 ### 1. 判别式评测（Multiple Choice）
@@ -128,6 +191,7 @@ python twinvoice/generative/Dimension_3/judge_step2.py \
 - 结果目录：
   - Dimension 2:
     - 判别式：`result/discriminative/dimension_2/`
+    - 生成式：`result/generative/dimension_2/`
   - Dimension 3:
     - 判别式：`result/discriminative/dimension_3/`
     - 生成式：`result/generative/dimension_3/`
