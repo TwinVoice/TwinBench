@@ -320,13 +320,57 @@ def main():
             fout.write(json.dumps(r, ensure_ascii=False) + "\n")
 
     ok = sum(1 for r in results if r.get("step1_status") == "Success")
+    failed = len(results) - ok
+    
+    # Save summary
+    summary_path = os.path.join(out_dir, "generation_summary.txt")
+    with open(summary_path, "w", encoding="utf-8") as f:
+        # Configuration
+        f.write("=== Dimension 3 Generation Summary ===\n\n")
+        f.write(f"Model: {args.gen_model}\n")
+        f.write(f"Workers: {args.workers}\n")
+        f.write(f"History Max: {args.history_max}\n\n")
+        
+        # Results
+        f.write("=== Results ===\n\n")
+        f.write(f"Total Samples: {len(results)}\n")
+        f.write(f"Success: {ok}\n")
+        f.write(f"Failed: {failed}\n")
+        f.write(f"Success Rate: {(ok/len(results)*100):.2f}%\n\n")
+        
+        # Example generations
+        f.write("=== Example Generations ===\n\n")
+        success_cases = [r for r in results if r.get("step1_status") == "Success"][:3]
+        for i, case in enumerate(success_cases, 1):
+            f.write(f"Example {i}:\n")
+            f.write(f"Context: {case.get('context', '')[:100]}...\n")
+            f.write(f"Generated: {case.get('lmut_reply', '')[:100]}...\n\n")
+        
+        # File locations
+        f.write("\nFull results saved in:\n")
+        f.write(f"- {os.path.basename(out_path)}\n")
+    
+    # Print console summary
     print("\n" + "="*60)
-    print("--- STEP1 SUMMARY ---")
+    print("📝 GENERATION SUMMARY")
     print("="*60)
-    print(f"Total: {len(results)}")
-    print(f"Success: {ok}  |  Failed: {len(results) - ok}")
+    print(f"📊 Total Samples: {len(results)}")
+    print(f"✅ Success: {ok}")
+    print(f"❌ Failed: {failed}")
+    print(f"📈 Success Rate: {(ok/len(results)*100):.2f}%")
+    
+    # Print example generations
+    if success_cases:
+        print("\n📋 Example Generations:")
+        for i, case in enumerate(success_cases, 1):
+            print(f"\nExample {i}:")
+            print(f"Context: {case.get('context', '')[:50]}...")
+            print(f"Generated: {case.get('lmut_reply', '')[:50]}...")
+    
+    print("\n💾 Results saved to:")
+    print(f"  - Summary: {os.path.basename(summary_path)}")
+    print(f"  - Details: {os.path.basename(out_path)}")
     print("="*60)
-    print(f"[Saved] {out_path}")
 
 if __name__ == "__main__":
     main()

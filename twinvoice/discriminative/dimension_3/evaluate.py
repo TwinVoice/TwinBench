@@ -430,5 +430,63 @@ def main():
         cap_required_df.to_csv(args.cap_report_csv, index=False)
         print(f"[Save] {args.cap_report_csv}")
 
+    # Save and print summary
+    summary_path = os.path.join(os.path.dirname(args.report), "summary.txt")
+    with open(summary_path, "w", encoding="utf-8") as f:
+        # Write configuration section
+        f.write("=== Dimension 3 Discriminative Evaluation Summary ===\n\n")
+        f.write(f"Model: {args.model}\n")
+        f.write(f"Sample Size: {'all' if not args.sample else args.sample}\n")
+        f.write(f"Temperature: {args.temperature}\n")
+        f.write(f"History Max: {args.history_max}\n\n")
+        
+        # Write results section
+        f.write("=== Results ===\n\n")
+        total_samples = len(eval_df)
+        correct_samples = eval_df["correct"].sum()
+        accuracy = (correct_samples/total_samples*100) if total_samples else 0
+        
+        f.write(f"Total Items: {total_samples}\n")
+        f.write(f"Correct Answers: {correct_samples}\n")
+        f.write(f"Accuracy: {accuracy:.2f}%\n\n")
+        
+        # Write capability analysis if available
+        if not cap_required_df.empty:
+            f.write("=== Capability Analysis ===\n\n")
+            f.write(cap_required_df.to_string())
+            f.write("\n\n")
+        
+        # Write file locations
+        f.write("\nFull results saved in:\n")
+        f.write(f"- {os.path.basename(args.report)}\n")
+        if args.wrong_report:
+            f.write(f"- {os.path.basename(args.wrong_report)}\n")
+        if args.cap_report_csv and not cap_required_df.empty:
+            f.write(f"- {os.path.basename(args.cap_report_csv)}\n")
+    
+    # Print summary to console
+    print("\n" + "="*50)
+    print("📊 EVALUATION SUMMARY")
+    print("="*50)
+    print(f"📈 Total Samples: {total_samples}")
+    print(f"✅ Correct: {correct_samples}")
+    print(f"🎯 Accuracy: {accuracy:.2f}%")
+    
+    if not cap_required_df.empty:
+        print("\n📋 Capability Analysis:")
+        # Print top 3 and bottom 3 capabilities by accuracy
+        sorted_caps = cap_required_df.sort_values("acc(%)", ascending=False)
+        print("\nTop 3 capabilities:")
+        for _, row in sorted_caps.head(3).iterrows():
+            print(f"  - {row['capability']}: {row['acc(%)']:.2f}% (n={row['n']})")
+        print("\nBottom 3 capabilities:")
+        for _, row in sorted_caps.tail(3).iterrows():
+            print(f"  - {row['capability']}: {row['acc(%)']:.2f}% (n={row['n']})")
+    
+    print("\n💾 Results saved to:")
+    print(f"  - Summary: {os.path.basename(summary_path)}")
+    print(f"  - Details: {os.path.basename(args.report)}")
+    print("="*50)
+
 if __name__=="__main__":
     main()

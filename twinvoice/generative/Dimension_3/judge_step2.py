@@ -285,15 +285,82 @@ def main():
     acc_pct = (sum(acc_list)/len(acc_list)*100) if acc_list else None
     s15_avg = avg(s15_list); sn_avg = avg(sn_list)
 
+    # Save summary
+    summary_path = out_dir / "judge_summary.txt"
+    with open(summary_path, "w", encoding="utf-8") as f:
+        # Configuration
+        f.write("=== Dimension 3 Judge Summary ===\n\n")
+        f.write(f"Judge Model: {args.judge_model}\n")
+        f.write(f"Workers: {args.workers}\n\n")
+        
+        # Results
+        f.write("=== Results ===\n\n")
+        f.write(f"Total Samples: {len(final_results)}\n")
+        if acc_pct is not None:
+            f.write(f"Acc.(Gen): {acc_pct:.2f}%  (n={len(acc_list)})\n")
+        if s15_avg is not None:
+            f.write(f"Score(Gen) 1-5: {s15_avg:.2f}  (n={len(s15_list)})\n")
+        if sn_avg is not None:
+            f.write(f"Score(Gen) 0-1: {sn_avg:.3f}  (n={len(sn_list)})\n\n")
+        
+        # Score distribution
+        if s15_list:
+            f.write("=== Score Distribution ===\n\n")
+            from collections import Counter
+            scores = Counter(s15_list)
+            for score in sorted(scores.keys()):
+                count = scores[score]
+                percentage = count/len(s15_list)*100
+                f.write(f"Score {score}: {count} samples ({percentage:.1f}%)\n")
+            f.write("\n")
+        
+        # Example cases
+        f.write("=== Example Cases ===\n\n")
+        # High scores (4-5)
+        high_scores = [r for r in final_results if r.get("score_gen_1to5", 0) >= 4][:2]
+        if high_scores:
+            f.write("High Score Examples:\n")
+            for case in high_scores:
+                f.write(f"Score: {case.get('score_gen_1to5')}\n")
+                f.write(f"Generated: {case.get('lmut_reply', '')[:100]}...\n\n")
+        
+        # Low scores (1-2)
+        low_scores = [r for r in final_results if r.get("score_gen_1to5", 0) <= 2][:2]
+        if low_scores:
+            f.write("Low Score Examples:\n")
+            for case in low_scores:
+                f.write(f"Score: {case.get('score_gen_1to5')}\n")
+                f.write(f"Generated: {case.get('lmut_reply', '')[:100]}...\n\n")
+        
+        # File locations
+        f.write("\nFull results saved in:\n")
+        f.write(f"- {out_path.name}\n")
+    
+    # Print console summary
     print("\n" + "="*60)
-    print("--- FINAL EVALUATION REPORT ---")
+    print("🔍 JUDGE EVALUATION SUMMARY")
     print("="*60)
-    print(f"Samples: {len(final_results)}")
-    print(f"Acc.(Gen): {acc_pct:.2f}%  (n={len(acc_list)})" if acc_pct is not None else "Acc.(Gen): N/A")
-    print(f"Score(Gen) 1–5: {s15_avg:.2f}  (n={len(s15_list)})" if s15_avg is not None else "Score(Gen) 1–5: N/A")
-    print(f"Score(Gen) 0–1: {sn_avg:.3f}  (n={len(sn_list)})" if sn_avg is not None else "Score(Gen) 0–1: N/A")
+    print(f"📊 Total Samples: {len(final_results)}")
+    if acc_pct is not None:
+        print(f"🎯 Acc.(Gen): {acc_pct:.2f}%")
+    if s15_avg is not None:
+        print(f"📈 Score(1-5): {s15_avg:.2f}")
+    if sn_avg is not None:
+        print(f"📊 Score(0-1): {sn_avg:.3f}")
+    
+    # Print score distribution
+    if s15_list:
+        print("\n📋 Score Distribution:")
+        scores = Counter(s15_list)
+        for score in sorted(scores.keys()):
+            count = scores[score]
+            percentage = count/len(s15_list)*100
+            print(f"  Score {score}: {count} samples ({percentage:.1f}%)")
+    
+    print("\n💾 Results saved to:")
+    print(f"  - Summary: {summary_path.name}")
+    print(f"  - Details: {out_path.name}")
     print("="*60)
-    print(f"[Saved] {out_path}")
 
 if __name__ == "__main__":
     main()
