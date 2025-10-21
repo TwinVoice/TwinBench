@@ -27,6 +27,30 @@ judge_base_url = 'https://svip.xty.app/v1'
 judge_api_key = 'sk-XOG1ygxM4TgeG8cx7b79DcB74aE344Ab93AcB2Cc868f1dB1'
 ```
 
+## Dimension 2评测命令
+
+### 判别式评测（User Style Matching）
+
+```bash
+# 测试运行（5个样本）
+python twinvoice/discriminative/dimension_2/evaluate.py \
+    --input dataset/dimension_2/conversation_data.jsonl \
+    --model '/common/users/mg1998/models/Qwen2.5-14B-Instruct' \
+    --sample 5 \
+    --report result/discriminative/dimension_2/results_test.jsonl \
+    --temperature 0.0 \
+    --history-max 30
+
+# 完整评测
+python twinvoice/discriminative/dimension_2/evaluate.py \
+    --input dataset/dimension_2/conversation_data.jsonl \
+    --model '/common/users/mg1998/models/Qwen2.5-14B-Instruct' \
+    --report result/discriminative/dimension_2/results.jsonl \
+    --wrong-report result/discriminative/dimension_2/wrong_cases.jsonl \
+    --temperature 0.0 \
+    --history-max 30
+```
+
 ## Dimension 3评测命令
 
 ### 1. 判别式评测（Multiple Choice）
@@ -98,10 +122,15 @@ python twinvoice/generative/Dimension_3/judge_step2.py \
 ## 常用目录
 
 - 模型路径：`/common/users/mg1998/models/Qwen2.5-14B-Instruct`
-- 数据目录：`dataset/dimension_3/`
+- 数据目录：
+  - Dimension 2: `dataset/dimension_2/`
+  - Dimension 3: `dataset/dimension_3/`
 - 结果目录：
-  - 判别式：`result/discriminative/dimension_3/`
-  - 生成式：`result/generative/dimension_3/`
+  - Dimension 2:
+    - 判别式：`result/discriminative/dimension_2/`
+  - Dimension 3:
+    - 判别式：`result/discriminative/dimension_3/`
+    - 生成式：`result/generative/dimension_3/`
 
 ## 调试技巧
 

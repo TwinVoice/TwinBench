@@ -1,0 +1,44 @@
+=== Dimension 2 Evaluation Summary ===
+
+Model: /common/users/mg1998/models/Qwen2.5-14B-Instruct
+Data: conversation_data.jsonl
+Sample Size: 5
+Temperature: 0.0
+History Max: 30
+
+=== Results ===
+
+Total Items: 5
+Correct Answers: 1
+Accuracy: 20.00%
+
+=== Error Analysis ===
+
+Wrong Cases: 4
+Error Rate: 80.00%
+
+Example Wrong Cases (up to 5):
+- User: 210944655
+  Context: Ясно...
+  Predicted: A (idx=0)
+  Correct: idx=3
+
+- User: 210944655
+  Context: /kick...
+  Predicted: A (idx=0)
+  Correct: idx=1
+
+- User: 298825443
+  Context: Etika dude...
+  Predicted: A (idx=0)
+  Correct: idx=2
+
+- User: 210944655
+  Context: /stat@combot...
+  Predicted: D (idx=3)
+  Correct: idx=0
+
+
+Full results saved in:
+- results_test.jsonl
+- wrong_cases.jsonl
