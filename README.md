@@ -1,6 +1,6 @@
 # TwinVoice
 
-TwinVoice is a dialogue system evaluation framework that supports multi-dimensional assessment of conversational capabilities.
+TwinVoice is a persona simulation benchmark towards digital twins that supports multi-dimensional assessment of conversational capabilities.
 
 ## Project Structure
 
