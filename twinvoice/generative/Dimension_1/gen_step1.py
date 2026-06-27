@@ -10,7 +10,11 @@ from itertools import islice
 from openai import OpenAI
 from tqdm import tqdm
 
-from api_config import api_key
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parents[3]))
+from twinvoice.api_config import twin_base_url, twin_api_key
 
 # ======================================================================================
 # --- 1. Configuration Section (Please modify your parameters here) ---
@@ -18,8 +22,8 @@ from api_config import api_key
 
 # --- API and Model Configuration ---
 # Your API Base URL and Key
-BASE_URL = "https://api.example.com/"  # Example, please replace with your API address
-API_KEY = api_key         # Example, please replace with your API key
+BASE_URL = twin_base_url
+API_KEY = twin_api_key
 
 # Define the models to use
 # LMUT_MODEL: The "attacker" model used to generate imitative replies
@@ -112,8 +116,8 @@ The reasoning should be concise, limited to 2-3 sentences.
 
 # Initialize OpenAI client
 # Ensure API key is provided, otherwise throw an error
-if API_KEY == "YOUR_API_KEY_HERE":
-    raise ValueError("Please replace 'YOUR_API_KEY_HERE' with your actual OpenAI API key.")
+if not API_KEY:
+    raise ValueError("Set TWINVOICE_TWIN_API_KEY or OPENAI_API_KEY before running this script.")
 client = OpenAI(base_url=BASE_URL, api_key=API_KEY)
 
 
@@ -367,7 +371,7 @@ if __name__ == "__main__":
     
     successful_step1 = [res for res in step1_results if res.get('step1_status') == 'Success']
     print(f"\nStep 1 finished. {len(successful_step1)}/{len(step1_results)} replies generated successfully.")
-    print(f"📝 Intermediate results saved to: {step1_output_path}")
+    print(f"Intermediate results saved to: {step1_output_path}")
 
     if not successful_step1:
         print("\nNo samples were successfully processed in Step 1. Exiting.")
@@ -392,7 +396,7 @@ if __name__ == "__main__":
     
     successful_step2 = [res for res in step2_results if res.get('step2_status') == 'Success']
     print(f"\nStep 2 finished. {len(successful_step2)}/{len(step2_results)} samples judged successfully.")
-    print(f"📝 Final evaluation results saved to: {step2_output_path}")
+    print(f"Final evaluation results saved to: {step2_output_path}")
 
     # --- Final Results Calculation and Report ---
     if successful_step2:
@@ -407,7 +411,7 @@ if __name__ == "__main__":
         print(f"Total Samples Judged: {total_valid_judgements}")
         print(f"Times Judge Chose LMUT's Reply: {lmut_chosen_count}")
         print("-" * 60)
-        print(f"🎯 Final Accuracy (LMUT Chosen Rate): {accuracy:.2f}%")
+        print(f"Final Accuracy (LMUT Chosen Rate): {accuracy:.2f}%")
         print("="*60)
         print("\nThis accuracy score represents the percentage of times the Judge LLM identified")
         print("the LMUT-generated reply as the most similar to the ground truth,")

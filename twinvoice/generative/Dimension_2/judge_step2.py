@@ -204,29 +204,29 @@ def main():
     
     # Print summary
     print("\n" + "="*60)
-    print("🔍 JUDGE EVALUATION SUMMARY")
+    print("JUDGE EVALUATION SUMMARY")
     print("="*60)
-    print(f"📊 Total Samples: {len(results)}")
-    print(f"✅ Success: {len(success)}")
-    print(f"❌ Failed/Skipped: {len(results) - len(success)}")
+    print(f"Total Samples: {len(results)}")
+    print(f"Success: {len(success)}")
+    print(f"Failed/Skipped: {len(results) - len(success)}")
     
     if scores:
         avg_score = sum(scores) / len(scores)
         avg_norm = sum(norm_scores) / len(norm_scores)
-        print(f"\n📈 Score Statistics:")
+        print(f"\nScore Statistics:")
         print(f"  Score(1-5): {avg_score:.2f}")
         print(f"  Score(0-1): {avg_norm:.3f}")
         
         # Score distribution
         from collections import Counter
         dist = Counter(scores)
-        print("\n📊 Score Distribution:")
+        print("\nScore Distribution:")
         for score in sorted(dist.keys()):
             count = dist[score]
             percentage = count/len(scores)*100
             print(f"  Score {score}: {count} samples ({percentage:.1f}%)")
     
-    print("\n💾 Results saved to:")
+    print("\nResults saved to:")
     print(f"  - {out_path}")
     print("="*60)
 

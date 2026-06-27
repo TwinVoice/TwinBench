@@ -148,13 +148,13 @@ def parse_json(text: str):
             except: return {"error":"JSON_PARSE_FAILED","raw_text":text}
     return {"error":"JSON_PARSE_FAILED","raw_text":text}
 
-# ================== Judger1: Map A/B/C/D → Acc.(Gen) ==================
+# ================== Judger1: Map A/B/C/D to Acc.(Gen) ==================
 def judger1_map(sample, judge_model):
     if not sample.get("lmut_reply") or "API_ERROR" in str(sample.get("lmut_reply")):
         sample["step2a_status"] = "Skipped"
         return sample
 
-    # 兼容两种结构
+    # Support both generation result schemas.
     opts = None
     gold_letter = None
     mcq = sample.get("mcq") or {}
@@ -194,7 +194,7 @@ def judger2_score(sample, judge_model):
         sample["step2b_status"] = "Skipped"
         return sample
 
-    # 取 ground truth 文本
+    # Get ground-truth text.
     gold = None
     mcq = sample.get("mcq") or {}
     if isinstance(mcq.get("options"), dict) and mcq.get("answer") in mcq["options"]:
@@ -248,7 +248,7 @@ def main():
     base = in_path.with_suffix("").name
     out_path = out_dir / f"Score_and_Map_on_{base}_by_{args.judge_model}.jsonl"
 
-    # 读取
+    # Load samples.
     samples = []
     with in_path.open("r", encoding="utf-8") as f:
         for i, line in enumerate(f, start=1):
@@ -257,14 +257,14 @@ def main():
             samples.append(obj)
     print(f"[Load] {len(samples)} samples from {in_path}")
 
-    # Judger1 并发
+    # Run Judger1 concurrently.
     mapped = []
     with ThreadPoolExecutor(max_workers=args.workers) as ex:
         futs = [ex.submit(judger1_map, s, args.judge_model) for s in samples]
         for fu in tqdm(as_completed(futs), total=len(futs), desc="Judger1 Mapping"):
             mapped.append(fu.result())
 
-    # Judger2 并发
+    # Run Judger2 concurrently.
     final_results = []
     with ThreadPoolExecutor(max_workers=args.workers) as ex:
         futs = [ex.submit(judger2_score, s, args.judge_model) for s in mapped]
@@ -276,7 +276,7 @@ def main():
         for r in final_results:
             fout.write(json.dumps(r, ensure_ascii=False) + "\n")
 
-    # 汇总
+    # Summarize.
     acc_list = [r.get("acc_gen") for r in final_results if isinstance(r.get("acc_gen"), int)]
     s15_list = [r.get("score_gen_1to5") for r in final_results if isinstance(r.get("score_gen_1to5"), int)]
     sn_list  = [r.get("score_gen_norm") for r in final_results if isinstance(r.get("score_gen_norm"), float)]
@@ -338,26 +338,26 @@ def main():
     
     # Print console summary
     print("\n" + "="*60)
-    print("🔍 JUDGE EVALUATION SUMMARY")
+    print("JUDGE EVALUATION SUMMARY")
     print("="*60)
-    print(f"📊 Total Samples: {len(final_results)}")
+    print(f"Total Samples: {len(final_results)}")
     if acc_pct is not None:
-        print(f"🎯 Acc.(Gen): {acc_pct:.2f}%")
+        print(f"Acc.(Gen): {acc_pct:.2f}%")
     if s15_avg is not None:
-        print(f"📈 Score(1-5): {s15_avg:.2f}")
+        print(f"Score(1-5): {s15_avg:.2f}")
     if sn_avg is not None:
-        print(f"📊 Score(0-1): {sn_avg:.3f}")
+        print(f"Score(0-1): {sn_avg:.3f}")
     
     # Print score distribution
     if s15_list:
-        print("\n📋 Score Distribution:")
+        print("\nScore Distribution:")
         scores = Counter(s15_list)
         for score in sorted(scores.keys()):
             count = scores[score]
             percentage = count/len(s15_list)*100
             print(f"  Score {score}: {count} samples ({percentage:.1f}%)")
     
-    print("\n💾 Results saved to:")
+    print("\nResults saved to:")
     print(f"  - Summary: {summary_path.name}")
     print(f"  - Details: {out_path.name}")
     print("="*60)

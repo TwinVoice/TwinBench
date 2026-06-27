@@ -1,239 +1,293 @@
+# -*- coding: utf-8 -*-
+"""Discriminative evaluation for TwinBench Dimension 1.
+
+Dimension 1 evaluates social-media persona matching: given a user's reply
+history and four candidate replies to a new post, the model picks the reply most
+likely written by the same user.
+"""
+
+from __future__ import annotations
+
+import argparse
 import json
+import os
+import random
 import re
 import time
-from tqdm import tqdm
-from sklearn.metrics import accuracy_score
+
 from openai import OpenAI
-from concurrent.futures import ThreadPoolExecutor
-from itertools import islice
-from api_config import api_key
 
-# API and model configuration
-#API_KEY = "your_api_key_here" 
-BASE_URL = "https://api.example.com/"  # Example, please replace with your API address
-#MODEL = "gpt-3.5-turbo"
-#MODEL_NAME = "gpt-3.5-turbo"
-#MODEL = "qwen2.5-14b-instruct"
-#MODEL_NAME = "qwen2.5-14b-instruct"
-#MODEL = "gpt-4o"
-#MODEL_NAME = "gpt-4o"
-#MODEL = "llama3.1-8b"
-#MODEL_NAME = "llama3.1-8b"
-#MODEL = "gpt-4o-mini"
-#MODEL_NAME = "gpt-4o-mini"
-#MODEL = "gemini-2.0-flash"
-#MODEL_NAME = "gemini-2.0-flash"
-#MODEL = "deepseek-v3"
-#MODEL_NAME = "deepseek-v3"
-#MODEL = "gpt-5-chat"
-#MODEL_NAME = "gpt-5-chat"
-#MODEL = "gemini-2.5-pro"
-#MODEL_NAME = "gemini-2.5-pro"
-#MODEL = "claude-sonnet-4-20250514"
-#MODEL_NAME = "claude-sonnet-4-20250514"
-#MODEL = "gpt-oss-20b"
-#MODEL_NAME = "gpt-oss-20b"
-#MODEL = "gemini-1.5-flash-latest"
-#MODEL_NAME = "gemini-1.5-flash-latest"
-MODEL = "llama3.1-70b"
-MODEL_NAME = "llama3.1-70b"
+from twinvoice.api_config import twin_api_key, twin_base_url, model_chat_extra_body
 
-# Set the data range to process. Note: Index starts from 1 for readability.
-# For example, [1, 100] means processing from the 1st to the 100th data entry.
-DATA_RANGE_START = 1001 # NEW: Starting line number of the data range (inclusive)
-DATA_RANGE_END = 1200  # NEW: Ending line number of the data range (inclusive)
 
-# [Requirement 2] Set the number of parallel worker threads
-NUM_WORKERS = 10
+EVAL_PROMPT = """You are given a social-media user's reply history and 4 candidate replies to a new anchor post. Only one candidate reply was actually written by this user.
 
-# Data and execution configuration
-DATA_SPLIT = "merged"
-#INPUT_PATH = f"../data/pchatbot_dataset/{DATA_SPLIT}/pchatbot_benchmark.filtered_by_choice_length_20.jsonl"
-INPUT_PATH = f"../data/pchatbot_dataset/{DATA_SPLIT}/pchatbot_pccd_top_2000.jsonl"
-# MODIFIED: Updated output filename to include data range information
-OUTPUT_PATH = f"pchatbot_pccd1_twin_{MODEL_NAME}_{DATA_SPLIT}_samples={DATA_RANGE_START}-{DATA_RANGE_END}_20.jsonl" # MODIFIED
+Your task is to choose the candidate most likely written by the same user, based on writing style, tone, interests, phrasing habits, and how the user usually reacts.
 
-# Original Prompt template (third-party analyst perspective)
-prompt_template_analyst = """You are given a user's comment history and 4 candidate tweets. 
-Your task is to identify which candidate is most likely written by the same user, based on writing style, tone, and themes.
-
-User's Comment History:
+User's Historical Replies:
 {history}
 
-Candidate Comments:
-A. {a}
-B. {b}
-C. {c}
-D. {d}
-
-You must respond in the following format:
-
-```json
-{{
-  "predicted_comment": "A",
-  "reasoning": "Explain why this comment was chosen."
-}}
-```"""
-
-# New Prompt template (digital twin perspective)
-prompt_template_digital_twin = """Your task is to act as a specific social media user, becoming their digital twin.
-Note: All provided text (history, post, choices) is in Chinese. You must analyze the user's style directly within the Chinese language context.
-
-Based on the user's reply history, think and respond with their mindset, tone, and style.
-
-Your reply history:
-(Note: "AnchorPost" is another user's post, and "UserReply" is your own reply.)
-{history}
-
-Now, you see a new post:
+Current Anchor Post:
 "{anchor}"
 
-Below are 4 candidate replies. Which one is most likely something you would say?
-
+Candidate Replies:
 A. {a}
 B. {b}
 C. {c}
 D. {d}
 
-Please respond in the following JSON format. In the "reasoning" field, use the first-person perspective ("I") to explain your choice.
+Return ONLY strict JSON in this format, with no prose before or after it:
+{{"choice": "A"}}
+"""
 
-```json
-{{
-  "predicted_comment": "A",
-  "reasoning": "Explain, from my perspective as the user, why I would choose this option."
-}}
-```"""
 
-# Switch here to decide which template to use for this run
-prompt_template = prompt_template_digital_twin
-#prompt_template = prompt_template_analyst
+def get_client() -> OpenAI:
+    return OpenAI(base_url=twin_base_url, api_key=twin_api_key)
 
-client = OpenAI(
-     base_url=BASE_URL, 
-     api_key=api_key,
+
+client = get_client()
+
+JSON_ONLY_SYSTEM = (
+    "You are a strict JSON-only multiple-choice classifier. "
+    "Think silently. Do not explain. Return exactly one JSON object like {\"choice\":\"A\"}."
 )
 
-def process_sample(sample):
-    """
-    Function to process a single data sample: send request to LLM and parse the result.
-    This function will be called in parallel.
-    """
-    anchor_post = sample["anchor_post"]
-    choices = sample["choices"]
-    label = sample["answer_idx"]
-    history = sample["history"]
 
-    # Fill in the prompt
-    filled_prompt = prompt_template.format(
-        anchor=anchor_post.strip(),
-        history="\n".join(history[-30:]),
-        a=choices[0],
-        b=choices[1],
-        c=choices[2],
-        d=choices[3]
+def parse_choice(resp: str) -> str | None:
+    try:
+        obj = json.loads(resp)
+        choice = str(obj.get("choice", "")).strip().upper()
+        return choice if choice in {"A", "B", "C", "D"} else None
+    except Exception:
+        pass
+    match = re.search(r'"?choice"?\s*[:=]\s*"?([ABCD])"?', str(resp), re.I)
+    return match.group(1).upper() if match else None
+
+
+def letter_to_index(letter: str | None) -> int:
+    return {"A": 0, "B": 1, "C": 2, "D": 3}.get(letter or "", -1)
+
+
+def clip_text(value: object, max_chars: int | None = None) -> str:
+    text = "" if value is None else str(value)
+    if max_chars and max_chars > 0 and len(text) > max_chars:
+        return text[:max_chars].rstrip() + "..."
+    return text
+
+
+def save_results(results: list[dict], output_path: str) -> None:
+    directory = os.path.dirname(output_path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        for item in results:
+            f.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+
+def print_section(title: str, char: str = "=") -> None:
+    line = char * 50
+    print(f"\n{line}")
+    print(title)
+    print(f"{line}\n")
+
+
+def create_chat_completion_with_retries(**kwargs):
+    last_error = None
+    for attempt in range(3):
+        try:
+            return client.chat.completions.create(**kwargs)
+        except Exception as exc:
+            last_error = exc
+            if attempt < 2:
+                time.sleep(1.5 * (attempt + 1))
+    raise last_error
+
+
+def evaluate_mcq(
+    input_path: str,
+    model: str,
+    sample_n: int | None = None,
+    report_path: str | None = None,
+    wrong_report_path: str | None = None,
+    temperature: float = 0.0,
+    history_max: int | None = 30,
+    seed: int | None = None,
+    context_max_chars: int | None = None,
+    choice_max_chars: int | None = None,
+    history_item_max_chars: int | None = 500,
+    max_tokens: int = 128,
+) -> list[dict]:
+    print_section("Evaluation Configuration", "-")
+    print(f"Model: {model}")
+    print(f"Temperature: {temperature}")
+    print(f"History Max: {'all' if not history_max else history_max}")
+    print(f"Max Tokens: {max_tokens}")
+    print(f"Sample Size: {'all' if not sample_n else sample_n}")
+    if seed is not None:
+        print(f"Seed: {seed}")
+
+    print_section("Loading Data", "-")
+    with open(input_path, "r", encoding="utf-8") as f:
+        rows = [json.loads(line) for line in f if line.strip()]
+    print(f"Found {len(rows)} social-persona entries")
+
+    if sample_n and sample_n < len(rows):
+        if seed is not None:
+            random.seed(seed)
+        random.shuffle(rows)
+        rows = rows[:sample_n]
+        print(f"Sampled {sample_n} entries for evaluation")
+
+    total = correct = 0
+    results: list[dict] = []
+    wrongs: list[dict] = []
+
+    print_section("Starting Evaluation", "-")
+    print(f"Processing {len(rows)} entries...\n")
+
+    for idx, row in enumerate(rows, 1):
+        if idx % 10 == 0:
+            print(f"Progress: {idx}/{len(rows)} entries processed")
+
+        raw_history = row.get("history") or []
+        if history_max:
+            raw_history = raw_history[-history_max:]
+        history = [clip_text(item, history_item_max_chars) for item in raw_history]
+        anchor = clip_text(row.get("anchor_post", ""), context_max_chars)
+        choices = [clip_text(choice, choice_max_chars) for choice in row.get("choices", [])]
+        answer_idx = row.get("answer_idx")
+
+        if not all([anchor, choices, isinstance(answer_idx, int), len(choices) == 4]):
+            continue
+        if not 0 <= answer_idx < 4:
+            continue
+
+        prompt = EVAL_PROMPT.format(
+            history="\n".join(history),
+            anchor=anchor,
+            a=choices[0],
+            b=choices[1],
+            c=choices[2],
+            d=choices[3],
+        )
+
+        try:
+            resp = create_chat_completion_with_retries(
+                model=model,
+                messages=[
+                    {"role": "system", "content": JSON_ONLY_SYSTEM},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens,
+                extra_body=model_chat_extra_body(model),
+            )
+            response_text = (resp.choices[0].message.content or "").strip()
+        except KeyboardInterrupt:
+            print("safe exit")
+            break
+        except Exception as exc:
+            print(f"API Error: {exc}")
+            time.sleep(1)
+            continue
+
+        choice = parse_choice(response_text)
+        pred_idx = letter_to_index(choice)
+        ok = pred_idx == answer_idx
+        total += 1
+        correct += int(ok)
+
+        rec = {
+            "user_id": row.get("user_id"),
+            "line_idx": row.get("line_idx"),
+            "original_line_idx": row.get("original_line_idx"),
+            "anchor_post": anchor,
+            "choices": choices,
+            "history_count": len(history),
+            "predicted_choice": choice,
+            "predicted_index": pred_idx,
+            "answer_index": answer_idx,
+            "correct": ok,
+            "parse_status": "ok" if choice else "failed",
+            "response_text": response_text,
+        }
+        results.append(rec)
+        if not ok:
+            wrongs.append(rec)
+
+    print_section("Evaluation Results", "=")
+    accuracy = correct / total * 100 if total else 0.0
+    print(f"Total Items Evaluated: {total}")
+    print(f"Correct Answers: {correct}")
+    print(f"Accuracy: {accuracy:.2f}%")
+
+    if wrongs:
+        print(f"\nIncorrect Answers: {len(wrongs)} / {total}")
+        print("\nTop 20 Wrong Cases:")
+        for wrong in wrongs[:20]:
+            print(
+                f"- user={wrong['user_id']} | picked={wrong['predicted_choice']} "
+                f"| answer_idx={wrong['answer_index']}"
+            )
+
+    if report_path:
+        print(f"\nSaving results to {report_path}...")
+        save_results(results, report_path)
+        print("Results saved successfully")
+
+    if wrong_report_path and wrongs:
+        print(f"\nSaving wrong cases to {wrong_report_path}...")
+        save_results(wrongs, wrong_report_path)
+        print("Wrong cases saved successfully")
+
+    return results
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Evaluate Dimension 1 social-media persona matching."
+    )
+    parser.add_argument(
+        "--input",
+        default="dataset/dimension_1/pchatbot_pccd_top_2000.jsonl",
+        help="Path to Dimension 1 JSONL data.",
+    )
+    parser.add_argument("--model", default="gpt-4o-mini", help="Model name to evaluate.")
+    parser.add_argument("--sample", type=int, help="Number of samples to evaluate.")
+    parser.add_argument(
+        "--report",
+        default="result/discriminative/dimension_1/results.jsonl",
+        help="Path to save evaluation results.",
+    )
+    parser.add_argument(
+        "--wrong-report",
+        default="result/discriminative/dimension_1/wrong_cases.jsonl",
+        help="Path to save wrong cases.",
+    )
+    parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument("--history-max", type=int, default=30)
+    parser.add_argument("--seed", type=int)
+    parser.add_argument("--context-max-chars", type=int)
+    parser.add_argument("--choice-max-chars", type=int)
+    parser.add_argument("--history-item-max-chars", type=int, default=500)
+    parser.add_argument("--max-tokens", type=int, default=128)
+    args = parser.parse_args()
+
+    evaluate_mcq(
+        input_path=args.input,
+        model=args.model,
+        sample_n=args.sample,
+        report_path=args.report,
+        wrong_report_path=args.wrong_report,
+        temperature=args.temperature,
+        history_max=args.history_max,
+        seed=args.seed,
+        context_max_chars=args.context_max_chars,
+        choice_max_chars=args.choice_max_chars,
+        history_item_max_chars=args.history_item_max_chars,
+        max_tokens=args.max_tokens,
     )
 
-    predicted_index = -1
-    reasoning = ""
-    
-    try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": filled_prompt}],
-        )
-        response_text = response.choices[0].message.content.strip()
-        
-        # Robustly extract JSON part from response text
-        match = re.search(r'\{[\s\S]*?\}', response_text)
-        if match:
-            json_part = match.group(0)
-            parsed = json.loads(json_part)
-            predicted_letter = parsed.get("predicted_comment", "").strip().upper()
-            reasoning = parsed.get("reasoning", "").strip()
-            if predicted_letter in ["A", "B", "C", "D"]:
-                predicted_index = ["A", "B", "C", "D"].index(predicted_letter)
-        else:
-            # If JSON not found, log the error
-            reasoning = f"LLM did not return a valid JSON object. Response: {response_text}"
-
-    except Exception as e:
-        # Log API call or other exceptions
-        reasoning = f"LLM error: {str(e)}"
-        # Retry logic can be added here, but for simplicity, we only log the error
-        time.sleep(1) # Wait briefly on error to avoid frequent request failures
-
-    # Return a dictionary containing all information for subsequent processing
-    return {
-        "line_idx": sample.get("line_idx", -1), # Use .get() to avoid issues with old data lacking line_idx key
-        "user_id": sample["user_id"],
-        "anchor_post": anchor_post,
-        "choices": choices,
-        "ground_truth_index": label,
-        "predicted_index": predicted_index,
-        "correct": int(predicted_index == label),
-        "reasoning": reasoning
-    }
 
 if __name__ == "__main__":
-    # --- MODIFIED: Modified file reading logic to support data range ---
-    # Validate input parameters
-    if DATA_RANGE_START <= 0 or DATA_RANGE_END < DATA_RANGE_START:
-        raise ValueError("Invalid DATA_RANGE settings. START must be > 0 and END must be >= START.")
-    
-    # Calculate the number of lines to skip and the number of lines to read
-    start_zero_based = DATA_RANGE_START - 1 # islice uses 0-based indexing
-    num_to_read = DATA_RANGE_END - DATA_RANGE_START + 1
-
-    print(f"Reading samples from line {DATA_RANGE_START} to {DATA_RANGE_END} from {INPUT_PATH}...")
-    with open(INPUT_PATH, 'r', encoding='utf-8') as f:
-        # Use islice to efficiently skip to the starting position and read specified number of lines
-        lines_iterator = islice(f, start_zero_based, DATA_RANGE_END)
-        lines = list(lines_iterator)
-        
-        # Check if enough lines were read
-        if len(lines) < num_to_read:
-            print(f"Warning: Requested range up to {DATA_RANGE_END}, but file only contains {start_zero_based + len(lines)} lines.")
-        
-        data_samples = []
-        for i, line in enumerate(lines):
-            sample = json.loads(line)
-            # Add original line number to each sample for traceability
-            sample['line_idx'] = start_zero_based + i + 1 
-            data_samples.append(sample)
-    # --- END MODIFIED ---
-    
-    if not data_samples:
-        print("No data samples found in the specified range. Exiting.")
-    else:
-        print(f"Successfully loaded {len(data_samples)} samples. Starting parallel processing with {NUM_WORKERS} workers...")
-        
-        analysis_results = []
-        # Create thread pool and execute tasks
-        with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
-            results_iterator = executor.map(process_sample, data_samples)
-            analysis_results = list(tqdm(results_iterator, total=len(data_samples), desc="Running LLM History Match"))
-
-        # Separate labels and predictions from results
-        labels = [res["ground_truth_index"] for res in analysis_results]
-        preds = [res["predicted_index"] for res in analysis_results]
-        
-        # Filter out failed predictions (-1)
-        valid_indices = [i for i, p in enumerate(preds) if p != -1]
-        valid_labels = [labels[i] for i in valid_indices]
-        valid_preds = [preds[i] for i in valid_indices]
-        
-        # Save output
-        print(f"Saving output to {OUTPUT_PATH}...")
-        with open(OUTPUT_PATH, 'w', encoding='utf-8') as f_out:
-            for item in analysis_results:
-                # Use sort_keys=False to maintain original order, indent=None and separators to save space
-                f_out.write(json.dumps(item, ensure_ascii=False) + '\n')
-
-        # Accuracy statistics
-        if valid_labels:
-            acc = accuracy_score(valid_labels, valid_preds)
-            print(f"\n📊 Prompt LLM Match Accuracy: {acc:.4f} on {len(valid_labels)} valid samples (out of {len(data_samples)} total)")
-        else:
-            print("\nNo valid predictions were made.")
-            
-        print(f"📝 Output saved to: {OUTPUT_PATH}")
+    main()

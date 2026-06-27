@@ -9,21 +9,27 @@ import re
 from openai import OpenAI
 from tqdm import tqdm
 
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parents[3]))
+from twinvoice.api_config import judge_base_url, judge_api_key
+
 # ======================================================================================
 # --- 1. Configuration Section (Please modify your parameters here) ---
 # ======================================================================================
 
 # --- API and Model Configuration ---
 # Your API Base URL and Key
-BASE_URL = "https://api.example.com/"  # Example, please replace with your API address
-API_KEY = "YOUR_API_KEY_HERE"  # 【IMPORTANT】Please replace with your real API key
+BASE_URL = judge_base_url
+API_KEY = judge_api_key
 
 # Define the "judge" model for scoring
 JUDGE_MODEL = "gpt-5-chat"  # Use gpt-5-chat according to your decision
 
 # --- Data and Execution Configuration ---
 ## Need to modify to adapt to different tracks
-# 【IMPORTANT】Input file path: This is the file containing replies to be evaluated (lmut_reply)
+# IMPORTANT: input file path containing replies to be evaluated (lmut_reply)
 # For example: "evaluation_results/step1_generations_lmut-gpt-4o-mini_judge-gpt-5-chat_range-1-2000.jsonl"
 INPUT_PATH = "evaluation_results/step1_generations_lmut-gpt-oss-20b_judge-gpt-5-chat_range-1-2000.jsonl"
 
@@ -105,8 +111,8 @@ Generated Reply to Evaluate:
 
 # Initialize OpenAI client
 # Ensure API key is provided, otherwise an error will be thrown
-if "sk-xxxxxxxx" in API_KEY or API_KEY == "":
-    raise ValueError("Please replace API_KEY with your real API key in the configuration section (Part 1) of the code.")
+if not API_KEY:
+    raise ValueError("Set TWINVOICE_JUDGE_API_KEY or OPENAI_API_KEY before running this script.")
 client = OpenAI(base_url=BASE_URL, api_key=API_KEY)
 
 
@@ -252,9 +258,9 @@ if __name__ == "__main__":
     failed_judgements = len(final_results) - len(successful_judgements)
     
     print(f"\nEvaluation completed.")
-    print(f"✅ Successfully evaluated: {len(successful_judgements)} entries")
-    print(f"❌ Failed/Skipped: {failed_judgements} entries")
-    print(f"📝 Detailed scoring results saved to: {output_path}")
+    print(f"Successfully evaluated: {len(successful_judgements)} entries")
+    print(f"Failed/Skipped: {failed_judgements} entries")
+    print(f"Detailed scoring results saved to: {output_path}")
 
     if successful_judgements:
         # Extract all valid scores
@@ -288,7 +294,7 @@ if __name__ == "__main__":
             print("  --- Score Distribution ---")
             for score, count in sorted(score_counts.items()):
                 percentage = (count / total_valid_scores) * 100 if total_valid_scores > 0 else 0
-                bar = "█" * int(percentage / 2) # Create a simple text bar chart
+                bar = "#" * int(percentage / 2) # Create a simple text bar chart
                 print(f"    Score {score}: {count:>5} entries ({percentage:5.1f}%)  {bar}")
             print("="*60)
         else:

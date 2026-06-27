@@ -184,26 +184,26 @@ def main():
     success = sum(1 for r in results if r['step1_status'] == 'Success')
     failed = len(results) - success
 
-        print("\n" + "="*60)
-    print("📝 GENERATION SUMMARY")
-        print("="*60)
-    print(f"📊 Total Samples: {len(results)}")
-    print(f"✅ Success: {success}")
-    print(f"❌ Failed: {failed}")
-    print(f"📈 Success Rate: {(success/len(results)*100):.2f}%")
+    print("\n" + "="*60)
+    print("GENERATION SUMMARY")
+    print("="*60)
+    print(f"Total Samples: {len(results)}")
+    print(f"Success: {success}")
+    print(f"Failed: {failed}")
+    print(f"Success Rate: {(success/len(results)*100):.2f}%")
     
     # Print example generations
     success_cases = [r for r in results if r['step1_status'] == 'Success'][:3]
     if success_cases:
-        print("\n📋 Example Generations:")
+        print("\nExample Generations:")
         for i, case in enumerate(success_cases, 1):
             print(f"\nExample {i}:")
             print(f"Context: {case['context'][:50]}...")
             print(f"Generated: {case['lmut_reply'][:50]}...")
     
-    print("\n💾 Results saved to:")
+    print("\nResults saved to:")
     print(f"  - {out_path}")
-        print("="*60)
+    print("="*60)
 
 if __name__ == "__main__":
     main()

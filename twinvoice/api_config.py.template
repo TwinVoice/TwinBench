@@ -1,8 +1,15 @@
-# API configuration for digital twin model
-twin_base_url = ''
-twin_api_key = ''
+"""Optional local config template.
 
-# API configuration for LLM-as-a-judge model
-judge_base_url = ''
-judge_api_key = ''
+The tracked `twinvoice/api_config.py` reads these values from environment
+variables. Prefer environment variables or a local `.env` file over editing
+source code.
+"""
+
+# OpenAI-compatible endpoint used for the model being evaluated.
+TWINVOICE_TWIN_BASE_URL = "http://localhost:8005/v1"
+TWINVOICE_TWIN_API_KEY = "EMPTY"
+
+# OpenAI-compatible endpoint used by LLM-as-a-judge scripts.
+TWINVOICE_JUDGE_BASE_URL = "https://api.openai.com/v1"
+TWINVOICE_JUDGE_API_KEY = "your-judge-api-key"
 

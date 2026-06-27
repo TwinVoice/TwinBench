@@ -28,7 +28,10 @@ wheels/
 .env.*.local
 *.pem
 credentials.json
-twinvoice/api_config.py
+
+# Local environments
+.venv/
+venv/
 
 # IDEs
 .idea/
@@ -42,5 +45,9 @@ Thumbs.db
 
 # Local Documentation
 README.local.md
+
+# Local smoke-test outputs
+result/smoke_mock/
+result/live_smoke/
 
 

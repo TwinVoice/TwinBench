@@ -29,7 +29,7 @@ Persona summary (may be partial):
 - Goals: {goals}
 - Details: {details}
 
-Scene context (preceding narration & situation, NOT the speaker’s own words):
+Scene context (preceding narration & situation, NOT the speaker's own words):
 \"\"\"{context}\"\"\"
 
 Consider the history utterances of this character. Style anchors from the TARGET's prior utterances (chronological, up to BEFORE chunk {chunk_id}):
@@ -37,9 +37,9 @@ Consider the history utterances of this character. Style anchors from the TARGET
 
 Hard requirements (STRICT):
 1) Language & Era: match the character's tone/era considering their dialogue history.
-2) Persona Fit: keep the TARGET’s formality, cadence, and turns of phrase.
+2) Persona Fit: keep the TARGET's formality, cadence, and turns of phrase.
 3) Scene Consistency: must be logically possible given the context; introduce no new facts/characters/locations.
-4) Length & Shape: one spoken line only (no stage directions); prefer 8–28 words unless a very short assent/command is natural.
+4) Length & Shape: one spoken line only (no stage directions); prefer 8-28 words unless a very short assent/command is natural.
 5) No Copying: do NOT copy any exact sentence from the dataset.
 
 
@@ -280,6 +280,7 @@ def main():
     ap.add_argument("--out_dir", default="evaluation_results", help="Output directory")
     ap.add_argument("--workers", type=int, default=8, help="Number of parallel workers")
     ap.add_argument("--history-max", type=int, default=30, help="Maximum history items")
+    ap.add_argument("--sample", type=int, help="Number of samples to process for a quick test")
     args = ap.parse_args()
 
     in_path = Path(args.input)
@@ -307,6 +308,13 @@ def main():
             samples.append(obj)
     print(f"[Load] {len(samples)} samples from {in_path}")
 
+    if args.sample and args.sample < len(samples):
+        import random
+        random.seed(42)
+        random.shuffle(samples)
+        samples = samples[:args.sample]
+        print(f"[Sample] {len(samples)} samples for quick generation")
+
     results = []
     with ThreadPoolExecutor(max_workers=args.workers) as ex:
         futs = [ex.submit(generate_for_sample, s, args.gen_model, profiles_map, histories_map, args.history_max)
@@ -323,7 +331,7 @@ def main():
     failed = len(results) - ok
     
     # Save summary
-    summary_path = os.path.join(out_dir, "generation_summary.txt")
+    summary_path = os.path.join(args.out_dir, "generation_summary.txt")
     with open(summary_path, "w", encoding="utf-8") as f:
         # Configuration
         f.write("=== Dimension 3 Generation Summary ===\n\n")
@@ -352,22 +360,22 @@ def main():
     
     # Print console summary
     print("\n" + "="*60)
-    print("📝 GENERATION SUMMARY")
+    print("GENERATION SUMMARY")
     print("="*60)
-    print(f"📊 Total Samples: {len(results)}")
-    print(f"✅ Success: {ok}")
-    print(f"❌ Failed: {failed}")
-    print(f"📈 Success Rate: {(ok/len(results)*100):.2f}%")
+    print(f"Total Samples: {len(results)}")
+    print(f"Success: {ok}")
+    print(f"Failed: {failed}")
+    print(f"Success Rate: {(ok/len(results)*100):.2f}%")
     
     # Print example generations
     if success_cases:
-        print("\n📋 Example Generations:")
+        print("\nExample Generations:")
         for i, case in enumerate(success_cases, 1):
             print(f"\nExample {i}:")
             print(f"Context: {case.get('context', '')[:50]}...")
             print(f"Generated: {case.get('lmut_reply', '')[:50]}...")
     
-    print("\n💾 Results saved to:")
+    print("\nResults saved to:")
     print(f"  - Summary: {os.path.basename(summary_path)}")
     print(f"  - Details: {os.path.basename(out_path)}")
     print("="*60)

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-import json, argparse, random, re, signal, os
+import json, argparse, random, re, signal, os, time
 from collections import defaultdict
 import pandas as pd
 from openai import OpenAI
-from twinvoice.api_config import twin_base_url, twin_api_key
+from twinvoice.api_config import twin_base_url, twin_api_key, model_chat_extra_body
 
 # --- API configuration ---
 # Discriminative task only uses Digital Twin API
@@ -17,6 +17,11 @@ def get_client(model_name=None):
 # Default client uses Digital Twin API
 client = get_client()
 
+JSON_ONLY_SYSTEM = (
+    "You are a strict JSON-only multiple-choice classifier. "
+    "Think silently. Do not explain. Return exactly one JSON object like {\"choice\":\"A\"}."
+)
+
 def load_json(path):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -25,18 +30,25 @@ def save_json(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-def chat(model, prompt, *, stream=False, verbose=False, json_mode=True, temperature=0.2, timeout=30):
+def chat(model, prompt, *, stream=False, verbose=False, json_mode=True, temperature=0.2, timeout=30, max_tokens=128):
     # Use Digital Twin API client
     current_client = get_client(model)
     
-    messages = [{"role": "user", "content": prompt}]
+    messages = [
+        {"role": "system", "content": JSON_ONLY_SYSTEM},
+        {"role": "user", "content": prompt},
+    ]
     kwargs = {
         "model": model,
         "messages": messages,
         "temperature": temperature,
         "stream": stream,
         "timeout": timeout,
+        "max_tokens": max_tokens,
     }
+    extra_body = model_chat_extra_body(model)
+    if extra_body:
+        kwargs["extra_body"] = extra_body
     
     # Digital Twin models generally don't support json_mode, use regex parsing instead
     # Can be manually enabled if the model supports json_mode
@@ -55,8 +67,16 @@ def chat(model, prompt, *, stream=False, verbose=False, json_mode=True, temperat
             print()
         return "".join(words)
     else:
-        resp = current_client.chat.completions.create(**kwargs)
-        return resp.choices[0].message.content
+        last_error = None
+        for attempt in range(3):
+            try:
+                resp = current_client.chat.completions.create(**kwargs)
+                return resp.choices[0].message.content
+            except Exception as exc:
+                last_error = exc
+                if attempt < 2:
+                    time.sleep(1.5 * (attempt + 1))
+        raise last_error
 
 STOP = False
 def _handle_sigint(signum, frame):
@@ -71,11 +91,11 @@ You are given ONLY:
 - a short persona/profile summary for that speaker (if available),
 - the preceding narration (context) BEFORE someone speaks,
 - the speaker's prior utterance history (chronological, up to BEFORE the given chunk),
-- four multiple-choice options (A–D), each a possible utterance.
+- four multiple-choice options (A-D), each a possible utterance.
 
 Task:
 Pick the SINGLE best option (A/B/C/D) that most plausibly fits the context AND the speaker's persona and prior utterances.
-Return ONLY strict JSON: {{"choice":"A"}} (A|B|C|D). Do not include any extra keys or text.
+Return ONLY strict JSON: {{"choice":"A"}} (A|B|C|D). Do not include any extra keys or text. Do not include prose before or after the JSON.
 
 Speaker: {speaker}
 
@@ -145,6 +165,12 @@ def persona_fields(p):
         d = "none"
     return (t,g,d)
 
+def clip_text(value, max_chars=None):
+    text = "" if value is None else str(value)
+    if max_chars and max_chars > 0 and len(text) > max_chars:
+        return text[:max_chars].rstrip() + "..."
+    return text
+
 def parse_choice(resp):
     try:
         obj = json.loads(resp)
@@ -200,7 +226,9 @@ def format_history(items, max_items=12):
 
 # =============== Evaluation (Model Response) ===============
 def evaluate_mcq_only(choices_path, profile_path, model, sample_n=None, report_path=None, wrong_report_path=None,
-                      temperature=0.0, history_max=12):
+                      temperature=0.0, history_max=12, seed=None,
+                      context_max_chars=None, profile_max_chars=None, choice_max_chars=None,
+                      max_tokens=128):
     """
     Read choices.jsonl, combine with profile.json's history and character settings,
     construct Prompt to let the model choose one from A/B/C/D.
@@ -212,7 +240,10 @@ def evaluate_mcq_only(choices_path, profile_path, model, sample_n=None, report_p
     print(f"Model: {model}")
     print(f"Temperature: {temperature}")
     print(f"History Max: {history_max}")
+    print(f"Max Tokens: {max_tokens}")
     print(f"Sample Size: {'all' if not sample_n else sample_n}")
+    if seed is not None:
+        print(f"Seed: {seed}")
     
     print_section("Loading Data", "-")
     print("Loading profiles...")
@@ -225,6 +256,8 @@ def evaluate_mcq_only(choices_path, profile_path, model, sample_n=None, report_p
     print(f"Found {len(rows)} choice entries")
     
     if sample_n and sample_n < len(rows):
+        if seed is not None:
+            random.seed(seed)
         random.shuffle(rows); rows = rows[:sample_n]
         print(f"Sampled {sample_n} entries for evaluation")
 
@@ -239,7 +272,7 @@ def evaluate_mcq_only(choices_path, profile_path, model, sample_n=None, report_p
         mcq = row.get("mcq") or {}
         opts = mcq.get("options") or {}
         ans = (mcq.get("answer") or "").upper()
-        ctx = row.get("context") or ""
+        ctx = clip_text(row.get("context") or "", context_max_chars)
         spk = row.get("speaker") or ""
         chunk_id = row.get("chunk_id")
         
@@ -252,6 +285,10 @@ def evaluate_mcq_only(choices_path, profile_path, model, sample_n=None, report_p
         match = best_match(spk, set(profiles_map.keys()))
         prof_obj = profiles_map.get(match)
         traits,goals,details = persona_fields(prof_obj)
+        traits = clip_text(traits, profile_max_chars)
+        goals = clip_text(goals, profile_max_chars)
+        details = clip_text(details, profile_max_chars)
+        opts = {k: clip_text(v, choice_max_chars) for k, v in opts.items()}
 
         canonical_spk = get_canonical_name(spk, profiles_map)
         hist_all = histories_map.get(canonical_spk, [])
@@ -263,7 +300,7 @@ def evaluate_mcq_only(choices_path, profile_path, model, sample_n=None, report_p
 
         prompt = build_prompt(spk, traits, goals, details, ctx, opts, chunk_id, history_text)
         try:
-            resp = chat(model, prompt, json_mode=True, temperature=temperature)
+            resp = chat(model, prompt, json_mode=True, temperature=temperature, max_tokens=max_tokens)
         except KeyboardInterrupt:
             print("safe exit"); break
 
@@ -281,7 +318,9 @@ def evaluate_mcq_only(choices_path, profile_path, model, sample_n=None, report_p
             "choice_text": choice_text,
             "answer": ans,
             "answer_text": answer_text,
-            "correct": ok
+            "correct": ok,
+            "parse_status": "ok" if choice else "failed",
+            "response_text": resp if isinstance(resp, str) else json.dumps(resp, ensure_ascii=False)
         }
         results.append(rec)
         if not ok:
@@ -302,10 +341,19 @@ def evaluate_mcq_only(choices_path, profile_path, model, sample_n=None, report_p
 
     if report_path:
         print(f"\nSaving results to {report_path}...")
+        os.makedirs(os.path.dirname(report_path), exist_ok=True)
         with open(report_path,"w",encoding="utf-8") as f:
             for r in results:
                 f.write(json.dumps(r,ensure_ascii=False)+"\n")
         print("Results saved successfully")
+
+    if wrong_report_path and wrongs:
+        print(f"\nSaving wrong cases to {wrong_report_path}...")
+        os.makedirs(os.path.dirname(wrong_report_path), exist_ok=True)
+        with open(wrong_report_path,"w",encoding="utf-8") as f:
+            for r in wrongs:
+                f.write(json.dumps(r,ensure_ascii=False)+"\n")
+        print("Wrong cases saved successfully")
 
     return pd.DataFrame(results)
 
@@ -377,6 +425,11 @@ def main():
     ap.add_argument("--temperature", type=float, default=0.0, help="Sampling temperature")
     ap.add_argument("--history-max", type=int, default=30, help="Maximum number of history items to include")
     ap.add_argument("--cap-report-csv", default="result/discriminative/dimension_3/capability_report.csv", help="Path to save capability analysis report (CSV format)")
+    ap.add_argument("--seed", type=int, help="Random seed for --sample")
+    ap.add_argument("--context-max-chars", type=int, help="Clip context text to reduce token cost")
+    ap.add_argument("--profile-max-chars", type=int, help="Clip persona profile fields to reduce token cost")
+    ap.add_argument("--choice-max-chars", type=int, help="Clip each answer choice to reduce token cost")
+    ap.add_argument("--max-tokens", type=int, default=128, help="Maximum completion tokens for the MCQ answer")
 
     # Step 2: Reuse + Capability statistics (required-cap only)
     ap.add_argument("--reuse-report", action="store_true", help="Don't re-evaluate, reuse JSONL from --report")
@@ -399,7 +452,12 @@ def main():
             report_path=args.report,
             wrong_report_path=args.wrong_report,
             temperature=args.temperature,
-            history_max=args.history_max
+            history_max=args.history_max,
+            seed=args.seed,
+            context_max_chars=args.context_max_chars,
+            profile_max_chars=args.profile_max_chars,
+            choice_max_chars=args.choice_max_chars,
+            max_tokens=args.max_tokens
         )
         print(f"[Info] Fresh evaluation rows: {len(eval_df)}")
 
@@ -466,14 +524,14 @@ def main():
     
     # Print summary to console
     print("\n" + "="*50)
-    print("📊 EVALUATION SUMMARY")
+    print("EVALUATION SUMMARY")
     print("="*50)
-    print(f"📈 Total Samples: {total_samples}")
-    print(f"✅ Correct: {correct_samples}")
-    print(f"🎯 Accuracy: {accuracy:.2f}%")
+    print(f"Total Samples: {total_samples}")
+    print(f"Correct: {correct_samples}")
+    print(f"Accuracy: {accuracy:.2f}%")
     
     if not cap_required_df.empty:
-        print("\n📋 Capability Analysis:")
+        print("\nCapability Analysis:")
         # Print top 3 and bottom 3 capabilities by accuracy
         sorted_caps = cap_required_df.sort_values("acc(%)", ascending=False)
         print("\nTop 3 capabilities:")
@@ -483,7 +541,7 @@ def main():
         for _, row in sorted_caps.tail(3).iterrows():
             print(f"  - {row['capability']}: {row['acc(%)']:.2f}% (n={row['n']})")
     
-    print("\n💾 Results saved to:")
+    print("\nResults saved to:")
     print(f"  - Summary: {os.path.basename(summary_path)}")
     print(f"  - Details: {os.path.basename(args.report)}")
     print("="*50)
