@@ -1,9 +1,9 @@
-# TwinBench Starter Panel Results
+# TwinBench General Starter Panel Results
 
 This page reports a lightweight discriminative smoke run for the recommended
-six-model starter panel. These numbers are useful for checking the evaluation
-pipeline and for previewing model behavior; they are not a paper-scale
-leaderboard.
+six-model general starter panel. These numbers are useful for checking the
+evaluation pipeline and for previewing model behavior; they are not a
+paper-scale leaderboard and not the final role-play-specialist leaderboard.
 
 Run configuration:
 

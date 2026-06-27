@@ -1,7 +1,7 @@
 # TwinBench
 
 <p align="center">
-  <img src="Figs/twinbench_hero.svg" alt="TwinBench: evaluate role-playing fidelity in LLMs" width="100%">
+  <img src="Figs/twinbench_hero.png" alt="TwinBench: benchmarking role-playing fidelity in LLMs" width="100%">
 </p>
 
 <p align="center">
@@ -10,6 +10,7 @@
 
 <p align="center">
   <a href="#quickstart">Quickstart</a> |
+  <a href="#role-play-model-leaderboard">Role-play leaderboard</a> |
   <a href="#starter-panel">Starter panel</a> |
   <a href="#what-twinbench-measures">What it measures</a> |
   <a href="#evaluation-modes">Evaluation modes</a> |
@@ -39,6 +40,29 @@ Unlike general chat benchmarks, TwinBench asks a sharper question:
   servers, and compatible model gateways.
 - **Model notes included**: see [`docs/model_notes.md`](docs/model_notes.md)
   for role-play model families and provider-specific tips.
+
+## Role-Play Model Leaderboard
+
+TwinBench is designed for a dedicated **role-playing model leaderboard**: models
+should be evaluated on how well they preserve a persona's voice, memory,
+relationships, behavior, and style across social, dialogue, and character
+settings.
+
+The public leaderboard should include both widely used general chat models and
+role-play / creative-writing-specialized models. Candidate families include:
+
+| Family | Examples to evaluate |
+| --- | --- |
+| Dedicated RP finetunes | Euryale / Stheno, Magnum, Rocinante, MythoMax / Mythalion, Noromaid, Pygmalion |
+| Gemma writing/RP models | Gemma 4 / Gemma 3 / Gemma 2 instruct models, Gemma-The-Writer, Gemma-Ataraxy, Gemma RP Writer-style finetunes |
+| Llama / Mistral RP variants | Llama creative-writing finetunes, Mistral Nemo writing/RP finetunes, Nemotron chat variants |
+| Strong chat baselines | Claude, GPT, Gemini, DeepSeek, Qwen, GLM, Hy3, and other reproducible OpenAI-compatible models |
+
+The current table below is a **general-model starter panel**, not the final
+role-play-specialist leaderboard. It is included so users can verify the
+pipeline immediately while the broader RP model panel is being expanded. See
+[`docs/model_notes.md`](docs/model_notes.md) for the growing role-play model
+candidate pool.
 
 ## Starter Panel
 
@@ -326,5 +350,13 @@ Git history before announcing the release.
 
 ## Citation
 
-If TwinBench or TwinVoice helps your work, please cite the paper. BibTeX will be
-updated here with the camera-ready ACL 2026 metadata.
+If TwinBench or TwinVoice helps your work, please cite the paper:
+
+```bibtex
+@article{du2025twinvoice,
+  title={TwinVoice: A Multi-dimensional Benchmark Towards Digital Twins via LLM Persona Simulation},
+  author={Du, Bangde and Guo, Minghao and He, Songming and Ye, Ziyi and Zhu, Xi and Su, Weihang and Zhu, Shuqi and Zhou, Yujia and Zhang, Yongfeng and Ai, Qingyao and others},
+  journal={arXiv preprint arXiv:2510.25536},
+  year={2025}
+}
+```

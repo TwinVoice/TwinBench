@@ -4,10 +4,15 @@ TwinBench can evaluate any OpenAI-compatible chat model. For public comparison,
 prefer models that are easy for other researchers to reproduce, plus a small set
 of role-play-oriented or role-play-adjacent models.
 
-## Common Role-Play Model Families to Check
+## Role-Play Leaderboard Candidate Pool
 
-Dedicated role-play models commonly discussed in the open-source RP community
-include:
+The public TwinBench leaderboard should not be limited to general chat models.
+It should include models that are actually used for character chat,
+role-playing, and creative writing, plus strong general baselines.
+
+### Dedicated RP and Character-Chat Finetunes
+
+Common search terms and model families:
 
 - Euryale / Stheno style Llama finetunes
 - Rocinante
@@ -15,10 +20,33 @@ include:
 - MythoMax / Mythalion
 - Noromaid
 - Pygmalion
-- Mistral Nemo / Nemotron creative-writing or RP finetunes
+- Kimiko / creative-writing Llama variants
+- Mistral Nemo creative-writing or RP finetunes
 
-These names are useful search terms when checking a provider's model roster.
-Not every API gateway exposes them.
+### Gemma Writing and RP Candidates
+
+Gemma models should be part of the role-play leaderboard rather than treated as
+an afterthought. Candidate families include:
+
+- Gemma 4 instruct variants, such as `gemma-4-26b-a4b-it` or larger variants
+- Gemma 3 instruct variants, such as `gemma-3-27b-it`
+- Gemma 2 instruct variants, such as `gemma-2-27b-it` and `gemma-2-9b-it`
+- Gemma-The-Writer style creative-writing finetunes
+- Gemma-Ataraxy / Gemma SPPO / Gemma RP Writer style finetunes
+
+### Strong Open and General Baselines
+
+These are useful for anchoring the leaderboard against widely available chat
+models:
+
+- Llama 3.1 / 3.3 / 4 chat or instruction variants
+- Mistral Large and Mistral Nemo variants
+- Nemotron chat variants
+- Qwen 2.5 / Qwen 3 / Qwen 3.5 / Qwen 3.7 chat variants
+- DeepSeek V3 / V4 variants
+- GLM 4.5 / GLM 5 variants
+- Hy3 preview-style models
+- Claude, GPT, and Gemini chat models
 
 ## Strong General Models Worth Testing
 
@@ -38,7 +66,8 @@ creative-writing-friendly models:
 
 ## Recommended Starter Panel
 
-For a compact public-facing TwinBench comparison, start with these six models:
+For a compact general-model TwinBench comparison, start with these six models.
+This is a smoke-test panel, not the final RP-specialist leaderboard:
 
 | Model | Note |
 | --- | --- |
@@ -54,6 +83,25 @@ Run the full three-dimension panel with:
 ```bash
 python -m twinvoice.evaluate --dimension all --preset small --models starter
 ```
+
+Run a custom role-play panel by passing comma-separated model IDs exposed by
+your OpenAI-compatible provider:
+
+```bash
+python -m twinvoice.evaluate \
+  --dimension all \
+  --preset small \
+  --models gemma-3-27b-it,gemma-4-26b-a4b-it,llama-3.1-nemotron-ultra-253b-v1
+```
+
+## External Discovery References
+
+Useful places to discover new role-play or creative-writing candidates:
+
+- [OpenRouter Roleplay collection](https://openrouter.ai/collections/roleplay)
+- [EQ-Bench Creative Writing leaderboard](https://eqbench.com/creative_writing.html)
+- Hugging Face searches for `roleplay`, `creative writing`, `Gemma writer`,
+  `Gemma RP`, `Euryale`, `Magnum`, `Rocinante`, `MythoMax`, and `Pygmalion`
 
 ## Provider Notes
 
