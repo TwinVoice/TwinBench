@@ -53,6 +53,8 @@ models:
 If dedicated RP models are unavailable, test strong chat models and recent
 creative-writing-friendly models:
 
+- `gpt-6-astra`
+- `claude-opus-5-5`
 - `gpt-5.2-chat-latest`
 - `gpt-5-chat-latest`
 - `claude-sonnet-4-6`
@@ -122,4 +124,12 @@ export TWINVOICE_EXTRA_BODY_JSON='{"reasoning_effort":"none"}'
 
 - Some reasoning models may return empty content when the completion budget is
   too low. The one-command CLI automatically uses `--max-tokens 256` for
-  `gpt-5.2*` models; other models default to 128.
+  `gpt-5.2*` models and `--max-tokens 512` for `gpt-6*` models; other models
+  default to 128.
+- `gpt-6-astra` reasons implicitly and returns empty content when the
+  completion budget is too small. For the Dimension 3 generative script, pass
+  `--max-tokens 1024` to `gen_step1`; when the judge is a reasoning model, pass
+  `--map-max-tokens 512` to `judge_step2`.
+- `claude-opus-5-5` can decline to imitate a persona whose history contains
+  hateful content. In the full Dimension 2 generative run it declined 7.3% of
+  the examples; see [`benchmark_results.md`](benchmark_results.md).

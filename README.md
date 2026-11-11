@@ -9,9 +9,17 @@
 </p>
 
 <p align="center">
+  <a href="https://arxiv.org/abs/2510.25536"><img src="https://img.shields.io/badge/arXiv-2510.25536-b31b1b.svg" alt="arXiv"></a>
+  <a href="https://twinvoice.github.io"><img src="https://img.shields.io/badge/Project-Page-2a78d6.svg" alt="Project page"></a>
+  <a href="https://huggingface.co/spaces/bangdedadi/TwinVoice-Leaderboard"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Leaderboard-Space-ffd21e.svg" alt="Leaderboard"></a>
+  <a href="https://huggingface.co/datasets/bangdedadi/TwinVoice"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Dataset-TwinVoice-ffd21e.svg" alt="Dataset"></a>
+</p>
+
+<p align="center">
   <a href="#quickstart">Quickstart</a> |
   <a href="#role-play-model-leaderboard">Role-play leaderboard</a> |
   <a href="#starter-panel">Starter panel</a> |
+  <a href="#full-benchmark-results">Full results</a> |
   <a href="#what-twinbench-measures">What it measures</a> |
   <a href="#evaluation-modes">Evaluation modes</a> |
   <a href="#citation">Citation</a>
@@ -82,6 +90,42 @@ a reproducibility check and preview, not as a final paper-scale leaderboard.
 
 Scores are percentages. Full counts, parse-failure notes, and reproduction
 details are in [`docs/benchmark_results.md`](docs/benchmark_results.md).
+
+## Full-Benchmark Results
+
+Results on the **full** benchmark: 5,687 examples, split 2,000 / 2,500 / 1,187
+across D1 / D2 / D3. Unlike the starter panel above, these are full-scale runs.
+`gpt-6-astra` and `claude-opus-5-5` were added in November 2026; the other rows
+are the results reported in the paper.
+
+Discriminative accuracy (%):
+
+| Rank | Model | D1 Social | D2 Dialogue | D3 Character | Macro Avg |
+| ---: | --- | ---: | ---: | ---: | ---: |
+| 1 | `gpt-6-astra` | **69.8** | **86.8** | **98.3** | **85.0** |
+| 2 | Claude-Sonnet-4 | 53.9 | 84.4 | 90.2 | 76.2 |
+| 3 | `claude-opus-5-5` | 55.7 | 74.8 | 96.9 | 75.8 |
+| 4 | GPT-5-Chat | 46.9 | 77.4 | 89.4 | 71.2 |
+| 5 | DeepSeek-V3 | 42.6 | 70.0 | 81.0 | 64.5 |
+| 6 | GPT-OSS-20B | 39.1 | 63.3 | 43.9 | 48.8 |
+| 7 | Qwen2.5-14B | 36.2 | 49.6 | 60.5 | 48.8 |
+| 8 | GPT-3.5-Turbo | 34.9 | 41.2 | 66.3 | 47.5 |
+| 9 | GPT-4o-mini | 35.3 | 39.2 | 63.1 | 45.9 |
+
+Generative evaluation of the two new models, judged by `gpt-5.5`. Acc.(Gen) is
+in percent and Score(Gen) is on a 1-5 scale:
+
+| Model | D1 Acc.(Gen) | D1 Score | D2 Score | D3 Acc.(Gen) | D3 Score | Avg Score |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `gpt-6-astra` | 46.9 | 2.83 | 1.74 | 65.5 | 2.17 | 2.25 |
+| `claude-opus-5-5` | 38.9 | 2.72 | 1.64 | 61.2 | 2.08 | 2.14 |
+
+Even the strongest model scores close to 2 out of 5 when it has to write the
+reply itself, so speaking in a persona's own voice remains unsolved. Counts and
+run settings are in
+[`docs/benchmark_results.md`](docs/benchmark_results.md#full-benchmark-results-november-2026);
+every metric of every model is on the
+[leaderboard](https://huggingface.co/spaces/bangdedadi/TwinVoice-Leaderboard).
 
 ## Quickstart
 
@@ -249,6 +293,15 @@ For deeper analysis, first ask the model to generate a persona-consistent reply,
 then use an LLM judge to map or score the generated reply against the reference.
 This mode costs more tokens but gives richer failure analysis.
 
+Dimension 1 generation with the ranking judge (Acc.(Gen)), then similarity
+scoring (Score(Gen)):
+
+```bash
+python -m twinvoice.generative.Dimension_1.gen_step1   --gen_model MODEL_NAME   --judge_model JUDGE_MODEL   --out_dir result/generative/dimension_1   --sample 20   --workers 4
+
+python -m twinvoice.generative.Dimension_1.judge_step2   --input result/generative/dimension_1/step1_generations_*.jsonl   --judge_model JUDGE_MODEL   --workers 4
+```
+
 Dimension 3 generation:
 
 ```bash
@@ -261,6 +314,10 @@ python -m twinvoice.generative.Dimension_3.gen_step1 \
   --workers 4 \
   --history-max 8
 ```
+
+Reasoning models return empty content when the completion budget is used up by
+reasoning. Add `--max-tokens 1024` to the generation command for such models,
+and `--map-max-tokens 512` to the judging command when the judge is one.
 
 Dimension 3 judging:
 
