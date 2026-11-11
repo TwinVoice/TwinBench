@@ -229,7 +229,8 @@ def generate_for_sample(sample: Dict[str, Any],
                         gen_model: str,
                         profiles_map: Dict[str, Any],
                         histories_map: Dict[str, List[Dict[str,Any]]],
-                        history_max: int):
+                        history_max: int,
+                        max_tokens: int = 256):
     spk = sample.get("speaker") or sample.get("speaker_match_key") or "Unknown Speaker"
     ctx = sample.get("context") or ""
     chunk_id = sample.get("chunk_id")
@@ -252,7 +253,7 @@ def generate_for_sample(sample: Dict[str, Any],
         chunk_id=chunk_id or "UNKNOWN"
     )
 
-    resp = call_llm(gen_model, [{"role":"user","content":prompt}], temperature=0.2, max_tokens=256)
+    resp = call_llm(gen_model, [{"role":"user","content":prompt}], temperature=0.2, max_tokens=max_tokens)
 
     sample = dict(sample)
     if isinstance(resp, str) and resp.startswith("API_ERROR"):
@@ -281,6 +282,9 @@ def main():
     ap.add_argument("--workers", type=int, default=8, help="Number of parallel workers")
     ap.add_argument("--history-max", type=int, default=30, help="Maximum history items")
     ap.add_argument("--sample", type=int, help="Number of samples to process for a quick test")
+    ap.add_argument("--max-tokens", type=int, default=256,
+                    help="Completion budget per reply. Raise it (e.g. 1024) for reasoning models, "
+                         "which return empty content when the budget is used up by reasoning.")
     args = ap.parse_args()
 
     in_path = Path(args.input)
@@ -317,7 +321,7 @@ def main():
 
     results = []
     with ThreadPoolExecutor(max_workers=args.workers) as ex:
-        futs = [ex.submit(generate_for_sample, s, args.gen_model, profiles_map, histories_map, args.history_max)
+        futs = [ex.submit(generate_for_sample, s, args.gen_model, profiles_map, histories_map, args.history_max, args.max_tokens)
                 for s in samples]
         for fu in tqdm(as_completed(futs), total=len(futs), desc="Step1 Generating"):
             results.append(fu.result())

@@ -261,7 +261,7 @@ def evaluate_mcq_only(choices_path, profile_path, model, sample_n=None, report_p
         random.shuffle(rows); rows = rows[:sample_n]
         print(f"Sampled {sample_n} entries for evaluation")
 
-    total = correct = 0
+    total = correct = api_failed = 0
     results, wrongs = [], []
 
     print_section("Starting Evaluation", "-")
@@ -303,6 +303,12 @@ def evaluate_mcq_only(choices_path, profile_path, model, sample_n=None, report_p
             resp = chat(model, prompt, json_mode=True, temperature=temperature, max_tokens=max_tokens)
         except KeyboardInterrupt:
             print("safe exit"); break
+        except Exception as exc:
+            # Same policy as Dimensions 1 and 2: skip the entry instead of
+            # losing every result collected so far.
+            api_failed += 1
+            print(f"[Warn] API call failed for chunk {chunk_id}; entry skipped: {exc}")
+            continue
 
         choice = parse_choice(resp if isinstance(resp,str) else json.dumps(resp))
         choice_text = opts.get(choice or "", "")
@@ -332,6 +338,8 @@ def evaluate_mcq_only(choices_path, profile_path, model, sample_n=None, report_p
     print(f"Total Items Evaluated: {total}")
     print(f"Correct Answers: {correct}")
     print(f"Accuracy: {acc:.2f}%")
+    if api_failed:
+        print(f"Entries skipped after API errors: {api_failed}")
     
     if wrongs:
         print(f"\nIncorrect Answers: {len(wrongs)} / {total}")
@@ -341,7 +349,7 @@ def evaluate_mcq_only(choices_path, profile_path, model, sample_n=None, report_p
 
     if report_path:
         print(f"\nSaving results to {report_path}...")
-        os.makedirs(os.path.dirname(report_path), exist_ok=True)
+        os.makedirs(os.path.dirname(report_path) or ".", exist_ok=True)
         with open(report_path,"w",encoding="utf-8") as f:
             for r in results:
                 f.write(json.dumps(r,ensure_ascii=False)+"\n")
@@ -349,7 +357,7 @@ def evaluate_mcq_only(choices_path, profile_path, model, sample_n=None, report_p
 
     if wrong_report_path and wrongs:
         print(f"\nSaving wrong cases to {wrong_report_path}...")
-        os.makedirs(os.path.dirname(wrong_report_path), exist_ok=True)
+        os.makedirs(os.path.dirname(wrong_report_path) or ".", exist_ok=True)
         with open(wrong_report_path,"w",encoding="utf-8") as f:
             for r in wrongs:
                 f.write(json.dumps(r,ensure_ascii=False)+"\n")

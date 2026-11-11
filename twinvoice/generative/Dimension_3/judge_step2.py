@@ -149,7 +149,7 @@ def parse_json(text: str):
     return {"error":"JSON_PARSE_FAILED","raw_text":text}
 
 # ================== Judger1: Map A/B/C/D to Acc.(Gen) ==================
-def judger1_map(sample, judge_model):
+def judger1_map(sample, judge_model, max_tokens=10):
     if not sample.get("lmut_reply") or "API_ERROR" in str(sample.get("lmut_reply")):
         sample["step2a_status"] = "Skipped"
         return sample
@@ -174,7 +174,7 @@ def judger1_map(sample, judge_model):
         A=opts["A"], B=opts["B"], C=opts["C"], D=opts["D"],
         pred=sample["lmut_reply"]
     )
-    resp = call_llm(judge_model, [{"role":"user","content":prompt}], temperature=0.0, max_tokens=10)
+    resp = call_llm(judge_model, [{"role":"user","content":prompt}], temperature=0.0, max_tokens=max_tokens)
 
     guess = (resp or "").strip().upper()
     if guess not in "ABCD":
@@ -238,6 +238,9 @@ def main():
     ap.add_argument("--input", required=True, help="path to step1_generations_*.jsonl")
     ap.add_argument("--judge_model", default=DEFAULT_JUDGE_MODEL)
     ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--map-max-tokens", type=int, default=10,
+                    help="Completion budget of the mapping judge (one letter). Raise it (e.g. 512) "
+                         "when the judge is a reasoning model.")
     args = ap.parse_args()
 
     in_path = Path(args.input)
@@ -260,7 +263,7 @@ def main():
     # Run Judger1 concurrently.
     mapped = []
     with ThreadPoolExecutor(max_workers=args.workers) as ex:
-        futs = [ex.submit(judger1_map, s, args.judge_model) for s in samples]
+        futs = [ex.submit(judger1_map, s, args.judge_model, args.map_max_tokens) for s in samples]
         for fu in tqdm(as_completed(futs), total=len(futs), desc="Judger1 Mapping"):
             mapped.append(fu.result())
 

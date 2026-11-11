@@ -41,7 +41,8 @@ JUDGE_MODEL = "gpt-5-chat"
 # --- Data and Execution Configuration ---
 ##Need to modify to adapt to different tracks
 # Input file path
-INPUT_PATH = "../data/pchatbot_dataset/merged/pchatbot_pccd_top_2000.jsonl"
+# Default input, relative to the repository root. Override with --input.
+INPUT_PATH = "dataset/dimension_1/pchatbot_pccd_top_2000.jsonl"
 
 # Which portion of the file to process (line numbers start from 1)
 # For example, DATA_RANGE_START = 1, DATA_RANGE_END = 1000 will process lines 1 to 1000
@@ -318,8 +319,30 @@ def step2_judge_similarity(sample):
 # ======================================================================================
 
 if __name__ == "__main__":
+    import argparse
+
+    # The constants in the configuration section are the defaults; every one of
+    # them can be overridden on the command line.
+    parser = argparse.ArgumentParser(
+        description="Dimension 1 generative evaluation: reply generation, then the ranking judge (Acc.(Gen)).")
+    parser.add_argument("--input", default=INPUT_PATH, help="Input JSONL file.")
+    parser.add_argument("--gen_model", default=LMUT_MODEL, help="Model under test.")
+    parser.add_argument("--judge_model", default=JUDGE_MODEL, help="Judge model for the ranking step.")
+    parser.add_argument("--out_dir", default="result/generative/dimension_1", help="Output directory.")
+    parser.add_argument("--start", type=int, default=DATA_RANGE_START, help="First line to process (1-based).")
+    parser.add_argument("--end", type=int, default=DATA_RANGE_END, help="Last line to process (inclusive).")
+    parser.add_argument("--sample", type=int, help="Process only N lines from --start (overrides --end).")
+    parser.add_argument("--workers", type=int, default=NUM_WORKERS, help="Number of parallel workers.")
+    cli_args = parser.parse_args()
+    INPUT_PATH = cli_args.input
+    LMUT_MODEL = cli_args.gen_model
+    JUDGE_MODEL = cli_args.judge_model
+    DATA_RANGE_START = cli_args.start
+    DATA_RANGE_END = cli_args.start + cli_args.sample - 1 if cli_args.sample else cli_args.end
+    NUM_WORKERS = cli_args.workers
+
     # --- File and directory setup ---
-    output_dir = "evaluation_results"
+    output_dir = cli_args.out_dir
     os.makedirs(output_dir, exist_ok=True)
     
     ##Need to modify to adapt to different tracks

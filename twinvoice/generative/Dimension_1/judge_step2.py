@@ -31,7 +31,8 @@ JUDGE_MODEL = "gpt-5-chat"  # Use gpt-5-chat according to your decision
 ## Need to modify to adapt to different tracks
 # IMPORTANT: input file path containing replies to be evaluated (lmut_reply)
 # For example: "evaluation_results/step1_generations_lmut-gpt-4o-mini_judge-gpt-5-chat_range-1-2000.jsonl"
-INPUT_PATH = "evaluation_results/step1_generations_lmut-gpt-oss-20b_judge-gpt-5-chat_range-1-2000.jsonl"
+# Default input. Override with --input.
+INPUT_PATH = "result/generative/dimension_1/step1_generations_lmut-gpt-oss-20b_judge-gpt-5-chat_range-1-2000.jsonl"
 
 # Output filename will be automatically generated based on input filename and Judge model, no need to set manually
 
@@ -201,6 +202,21 @@ def perform_judgement(sample):
 # ======================================================================================
 
 if __name__ == "__main__":
+    import argparse
+
+    # The constants in the configuration section are the defaults; they can be
+    # overridden on the command line.
+    parser = argparse.ArgumentParser(
+        description="Dimension 1 generative evaluation: similarity scoring of generated replies (Score(Gen)).")
+    parser.add_argument("--input", default=INPUT_PATH,
+                        help="JSONL file with generated replies (output of gen_step1).")
+    parser.add_argument("--judge_model", default=JUDGE_MODEL, help="Judge model for scoring.")
+    parser.add_argument("--workers", type=int, default=NUM_WORKERS, help="Number of parallel workers.")
+    cli_args = parser.parse_args()
+    INPUT_PATH = cli_args.input
+    JUDGE_MODEL = cli_args.judge_model
+    NUM_WORKERS = cli_args.workers
+
     # --- File and Directory Setup ---
     if "YOUR_GENERATED_REPLIES_FILE.jsonl" in INPUT_PATH:
         raise ValueError("Please set INPUT_PATH to your real input file path in the configuration section (Part 1) of the code.")
@@ -210,7 +226,9 @@ if __name__ == "__main__":
     
     ## Need to modify to adapt to different tracks
     # Dynamically generate output filename - May need to include track information
-    output_filename = f"Score_judgements_on_{base_filename}_by_{JUDGE_MODEL}.jsonl"
+    # Keep the name short: long names break checkouts on Windows (260-character path limit).
+    short_name = base_filename.replace("step1_generations_", "", 1)
+    output_filename = f"scores_{short_name}_by-{JUDGE_MODEL}.jsonl"
     output_path = os.path.join(output_dir, output_filename)
 
     # --- Data Loading ---

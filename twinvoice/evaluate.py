@@ -62,11 +62,20 @@ def _default_model() -> str:
     return os.getenv("TWINVOICE_MODEL") or os.getenv("TWINBENCH_MODEL") or "gpt-4o-mini"
 
 
+# Models that reason before answering return empty content when the completion
+# budget is used up by reasoning, so they get a larger default budget.
+REASONING_MODEL_BUDGETS = (
+    ("gpt-6", 512),
+    ("gpt-5.2", 256),
+)
+
+
 def _effective_max_tokens(args: argparse.Namespace, model: str) -> int:
     if args.max_tokens is not None:
         return args.max_tokens
-    if "gpt-5.2" in model.lower():
-        return 256
+    for marker, budget in REASONING_MODEL_BUDGETS:
+        if marker in model.lower():
+            return budget
     return PRESETS[args.preset]["max_tokens"]
 
 
