@@ -18,6 +18,7 @@ import time
 from openai import OpenAI
 
 from twinvoice.api_config import twin_api_key, twin_base_url, model_chat_extra_body
+from twinvoice.data_versions import item_accuracy
 
 
 EVAL_PROMPT = """You are given a social-media user's reply history and 4 candidate replies to a new anchor post. Only one candidate reply was actually written by this user.
@@ -212,6 +213,8 @@ def evaluate_mcq(
             "parse_status": "ok" if choice else "failed",
             "response_text": response_text,
         }
+        if row.get("item_id") is not None:
+            rec["item_id"] = row["item_id"]
         results.append(rec)
         if not ok:
             wrongs.append(rec)
@@ -221,6 +224,9 @@ def evaluate_mcq(
     print(f"Total Items Evaluated: {total}")
     print(f"Correct Answers: {correct}")
     print(f"Accuracy: {accuracy:.2f}%")
+    item_acc = item_accuracy(results)
+    if item_acc is not None:
+        print(f"Item-averaged Accuracy: {item_acc[0]:.2f}% over {item_acc[1]} distinct items")
     if api_failed:
         print(f"Entries skipped after API errors: {api_failed}")
 

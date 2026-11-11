@@ -96,6 +96,7 @@ def generate_reply(sample, model, temperature=0.0):
             "context": sample.get("context"),
             "choices": sample.get("choices"),
             "answer_idx": sample.get("answer_idx"),
+            "item_id": sample.get("item_id"),
             "history": sample.get("history"),
             "lmut_reply": f"API_ERROR: {str(e)}",
             "step1_status": "Failed"
@@ -109,6 +110,7 @@ def generate_reply(sample, model, temperature=0.0):
             "context": sample.get("context"),
             "choices": sample.get("choices"),
             "answer_idx": sample.get("answer_idx"),
+            "item_id": sample.get("item_id"),
             "history": sample.get("history"),
             "lmut_reply": f"PARSE_ERROR: {resp_text}",
             "step1_status": "Failed"
@@ -120,6 +122,7 @@ def generate_reply(sample, model, temperature=0.0):
         "context": sample.get("context"),
         "choices": sample.get("choices"),
         "answer_idx": sample.get("answer_idx"),
+            "item_id": sample.get("item_id"),
         "history": sample.get("history"),
         "lmut_reply": gen,
         "step1_status": "Success"

@@ -107,3 +107,61 @@ Notes:
   denominator, together with 3 judge outputs that could not be parsed.
   Counting all 28 as incorrect gives 38.40%.
 - Parse failures in the discriminative mode are counted as incorrect.
+
+## Data Version v1.1
+
+v1.1 is a re-filtered version of the benchmark data. v1.0, the data used in the
+paper, stays the default of every command and is unchanged.
+
+- A row is dropped when its reference reply also appears in the history
+  (Dimensions 1 and 2) or in the context (Dimension 3) shown to the model.
+- Rows that share the same stimulus and the same reference reply form one item.
+  A metric is averaged over the rows of an item first and then over items, so
+  every distinct question counts once.
+
+The rule depends only on the data, not on any model output. It is stored as
+`dataset/v1.1/index.json`; `python -m twinvoice.data_versions build` writes the
+v1.1 files, and each row carries its `item_id`.
+
+| Dimension | v1.0 rows | v1.1 rows | v1.1 items |
+| --- | ---: | ---: | ---: |
+| D1 Social | 2,000 | 1,986 | 1,984 |
+| D2 Dialogue | 2,500 | 2,008 | 94 |
+| D3 Character | 1,187 | 1,146 | 1,079 |
+
+Run the discriminative evaluation on v1.1 with:
+
+```bash
+python -m twinvoice.evaluate --dimension all --preset full --model MODEL_NAME --data-version v1.1
+```
+
+The command prints the item-averaged accuracy next to the row-level one. For
+the generative scripts, pass a v1.1 file as `--input` and average any result
+file by item with:
+
+```bash
+python -m twinvoice.data_versions score --input RESULT.jsonl --field score_gen_1to5
+```
+
+### v1.1 results
+
+Computed from the same model outputs and judgements as the v1.0 runs above;
+v1.1 rows are a subset of the v1.0 rows. Scores of the two versions are not
+directly comparable.
+
+Discriminative accuracy (%):
+
+| Model | D1 Social | D2 Dialogue | D3 Character | Macro Avg |
+| --- | ---: | ---: | ---: | ---: |
+| `gpt-6-astra` | 69.56 | 70.27 | 98.56 | 79.46 |
+| `claude-opus-5-5` | 55.37 | 57.30 | 97.45 | 70.04 |
+
+Generative evaluation, judged by `gpt-5.5`:
+
+| Model | D1 Acc.(Gen) | D1 Score | D2 Score | D3 Acc.(Gen) | D3 Score | Avg Score |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `gpt-6-astra` | 46.67% | 2.83 | 1.52 | 66.59% | 2.20 | 2.18 |
+| `claude-opus-5-5` | 38.80% | 2.72 | 1.43 | 61.72% | 2.10 | 2.08 |
+
+v1.1 results for the models evaluated in the paper will be added as they are
+re-scored.

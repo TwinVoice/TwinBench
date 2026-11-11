@@ -127,6 +127,23 @@ run settings are in
 every metric of every model is on the
 [leaderboard](https://huggingface.co/spaces/bangdedadi/TwinVoice-Leaderboard).
 
+### Data version v1.1
+
+v1.1 removes rows whose reference reply also appears in the history or context
+shown to the model, and scores each distinct question once: rows that share the
+same stimulus and reference reply are averaged. v1.0, the data used in the
+paper, stays the default and is unchanged. Scores of the two versions are not
+directly comparable.
+
+| Model | D1 Social | D2 Dialogue | D3 Character | Macro Avg | Avg Score(Gen) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `gpt-6-astra` | 69.6 | 70.3 | 98.6 | 79.5 | 2.18 |
+| `claude-opus-5-5` | 55.4 | 57.3 | 97.5 | 70.0 | 2.08 |
+
+```bash
+python -m twinvoice.evaluate --dimension all --preset full --model MODEL_NAME --data-version v1.1
+```
+
 ## Quickstart
 
 ### 1. Install

@@ -53,3 +53,5 @@ result/live_smoke/
 # Local evaluation outputs
 result/quick_eval/
 evaluation_results/
+# v1.1 files are generated from dataset/v1.1/index.json
+dataset/v1.1/dimension_*.jsonl

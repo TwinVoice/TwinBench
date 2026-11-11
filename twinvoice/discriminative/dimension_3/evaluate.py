@@ -4,6 +4,7 @@ from collections import defaultdict
 import pandas as pd
 from openai import OpenAI
 from twinvoice.api_config import twin_base_url, twin_api_key, model_chat_extra_body
+from twinvoice.data_versions import item_accuracy
 
 # --- API configuration ---
 # Discriminative task only uses Digital Twin API
@@ -328,6 +329,8 @@ def evaluate_mcq_only(choices_path, profile_path, model, sample_n=None, report_p
             "parse_status": "ok" if choice else "failed",
             "response_text": resp if isinstance(resp, str) else json.dumps(resp, ensure_ascii=False)
         }
+        if row.get("item_id") is not None:
+            rec["item_id"] = row["item_id"]
         results.append(rec)
         if not ok:
             wrongs.append(rec)
@@ -338,6 +341,9 @@ def evaluate_mcq_only(choices_path, profile_path, model, sample_n=None, report_p
     print(f"Total Items Evaluated: {total}")
     print(f"Correct Answers: {correct}")
     print(f"Accuracy: {acc:.2f}%")
+    item_acc = item_accuracy(results)
+    if item_acc is not None:
+        print(f"Item-averaged Accuracy: {item_acc[0]:.2f}% over {item_acc[1]} distinct items")
     if api_failed:
         print(f"Entries skipped after API errors: {api_failed}")
     

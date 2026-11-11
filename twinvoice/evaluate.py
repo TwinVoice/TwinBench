@@ -8,6 +8,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from twinvoice.data_versions import VERSIONS, input_path as default_input_path
 from twinvoice.discriminative.dimension_1.evaluate import evaluate_mcq as evaluate_dim1
 from twinvoice.discriminative.dimension_2.evaluate import evaluate_mcq as evaluate_dim2
 from twinvoice.discriminative.dimension_3.evaluate import evaluate_mcq_only as evaluate_dim3
@@ -111,9 +112,12 @@ def _run_one(args: argparse.Namespace, model: str) -> None:
     history_item_max_chars = _preset_value(args, "history_item_max_chars")
     max_tokens = _effective_max_tokens(args, model)
     report_model = _safe_name(model)
+    if args.data_version != "v1.0":
+        # Keep reports of different data versions apart.
+        report_model = f"{report_model}_{args.data_version}"
 
     if args.dimension == "1":
-        input_path = args.input or "dataset/dimension_1/pchatbot_pccd_top_2000.jsonl"
+        input_path = args.input or default_input_path(1, args.data_version)
         report = report_dir / f"dimension1_{report_model}_{args.preset}.jsonl"
         wrong_report = report_dir / f"dimension1_{report_model}_{args.preset}_wrong.jsonl"
         evaluate_dim1(
@@ -133,7 +137,7 @@ def _run_one(args: argparse.Namespace, model: str) -> None:
         return
 
     if args.dimension == "2":
-        input_path = args.input or "dataset/dimension_2/conversation_data.jsonl"
+        input_path = args.input or default_input_path(2, args.data_version)
         report = report_dir / f"dimension2_{report_model}_{args.preset}.jsonl"
         wrong_report = report_dir / f"dimension2_{report_model}_{args.preset}_wrong.jsonl"
         evaluate_dim2(
@@ -152,7 +156,7 @@ def _run_one(args: argparse.Namespace, model: str) -> None:
         )
         return
 
-    choices = args.input or "dataset/dimension_3/choices.jsonl"
+    choices = args.input or default_input_path(3, args.data_version)
     profiles = args.profiles or "dataset/dimension_3/profiles.jsonl"
     report = report_dir / f"dimension3_{report_model}_{args.preset}.jsonl"
     wrong_report = report_dir / f"dimension3_{report_model}_{args.preset}_wrong.jsonl"
@@ -205,6 +209,13 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--report-dir", default="result/quick_eval")
     parser.add_argument("--input", help="Override input JSONL path.")
+    parser.add_argument(
+        "--data-version",
+        choices=VERSIONS,
+        default="v1.0",
+        help="Benchmark data version. v1.0 is the data of the paper; v1.1 is the re-filtered split "
+             "scored once per distinct question (see docs/benchmark_results.md).",
+    )
     parser.add_argument("--profiles", help="Override Dimension 3 profile JSON path.")
     args = parser.parse_args()
 
