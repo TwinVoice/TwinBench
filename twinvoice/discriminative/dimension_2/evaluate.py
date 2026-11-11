@@ -5,7 +5,7 @@ from sklearn.metrics import accuracy_score
 from openai import OpenAI
 import sys
 from pathlib import Path
-sys.path.append(str(Path(__file__).parent.parent.parent))
+sys.path.append(str(Path(__file__).resolve().parents[3]))
 from twinvoice.api_config import twin_base_url, twin_api_key, model_chat_extra_body
 
 # ================== API Configuration ==================
@@ -72,7 +72,7 @@ def clip_text(value, max_chars=None):
 
 def save_results(results, output_path):
     """Save results to JSONL file"""
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     with open(output_path, 'w', encoding='utf-8') as f:
         for item in results:
             f.write(json.dumps(item, ensure_ascii=False) + '\n')
@@ -127,7 +127,7 @@ def evaluate_mcq(input_path, model, sample_n=None, report_path=None, wrong_repor
         rows = rows[:sample_n]
         print(f"Sampled {sample_n} entries for evaluation")
 
-    total = correct = 0
+    total = correct = api_failed = 0
     results, wrongs = [], []
     
     print_section("Starting Evaluation", "-")
@@ -176,10 +176,13 @@ def evaluate_mcq(input_path, model, sample_n=None, report_path=None, wrong_repor
                 max_tokens=max_tokens,
                 extra_body=model_chat_extra_body(model)
             )
-            resp_text = resp.choices[0].message.content.strip()
+            # Empty content (for example a reasoning model that ran out of budget)
+            # counts as a wrong answer, as in Dimensions 1 and 3.
+            resp_text = (resp.choices[0].message.content or "").strip()
         except KeyboardInterrupt:
             print("safe exit"); break
         except Exception as e:
+            api_failed += 1
             print(f"API Error: {e}")
             continue
 
@@ -213,6 +216,8 @@ def evaluate_mcq(input_path, model, sample_n=None, report_path=None, wrong_repor
     print(f"Total Items Evaluated: {total}")
     print(f"Correct Answers: {correct}")
     print(f"Accuracy: {acc:.2f}%")
+    if api_failed:
+        print(f"Entries skipped after API errors: {api_failed}")
     
     if wrongs:
         print(f"\nIncorrect Answers: {len(wrongs)} / {total}")

@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from openai import OpenAI
 import sys
-sys.path.append(str(Path(__file__).parent.parent.parent))
+sys.path.append(str(Path(__file__).resolve().parents[3]))
 from twinvoice.api_config import judge_base_url, judge_api_key
 
 # ================== API Configuration ==================
@@ -192,7 +192,11 @@ def main():
     
     # Save results
     out_dir = os.path.dirname(args.input)
-    out_path = os.path.join(out_dir, f"Score_and_Analysis_by_{os.path.basename(args.judge_model)}.jsonl")
+    # Name the output after the input as well, so judging a second model does
+    # not overwrite the first one.
+    stem = os.path.splitext(os.path.basename(args.input))[0].replace("step1_generations_", "", 1)
+    safe_judge = "".join(c if (c.isalnum() or c in "_.-") else "_" for c in args.judge_model)
+    out_path = os.path.join(out_dir, f"Score_and_Analysis_{stem}_by_{safe_judge}.jsonl")
     with open(out_path, 'w', encoding='utf-8') as f:
         for r in results:
             f.write(json.dumps(r, ensure_ascii=False) + '\n')

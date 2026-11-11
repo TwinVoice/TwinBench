@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from openai import OpenAI
 import sys
-sys.path.append(str(Path(__file__).parent.parent.parent))
+sys.path.append(str(Path(__file__).resolve().parents[3]))
 from twinvoice.api_config import twin_base_url, twin_api_key
 
 # ================== API Configuration ==================
@@ -141,6 +141,10 @@ def main():
                        help="Sampling temperature")
     
     args = parser.parse_args()
+    # A Windows console or a redirected stdout may not be able to encode every
+    # character of the data (for example emoji); do not crash on printing.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
     
     # Create output directory
     os.makedirs(args.out_dir, exist_ok=True)

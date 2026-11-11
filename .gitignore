@@ -50,4 +50,6 @@ README.local.md
 result/smoke_mock/
 result/live_smoke/
 
-
+# Local evaluation outputs
+result/quick_eval/
+evaluation_results/

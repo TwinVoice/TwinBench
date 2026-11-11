@@ -228,7 +228,8 @@ if __name__ == "__main__":
     # Dynamically generate output filename - May need to include track information
     # Keep the name short: long names break checkouts on Windows (260-character path limit).
     short_name = base_filename.replace("step1_generations_", "", 1)
-    output_filename = f"scores_{short_name}_by-{JUDGE_MODEL}.jsonl"
+    safe_judge = re.sub(r"[^A-Za-z0-9_.-]+", "_", JUDGE_MODEL)  # "/" is not valid in a file name
+    output_filename = f"scores_{short_name}_by-{safe_judge}.jsonl"
     output_path = os.path.join(output_dir, output_filename)
 
     # --- Data Loading ---

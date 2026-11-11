@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[3]))
-from twinvoice.api_config import twin_base_url, twin_api_key
+from twinvoice.api_config import twin_base_url, twin_api_key, judge_base_url, judge_api_key
 
 # ======================================================================================
 # --- 1. Configuration Section (Please modify your parameters here) ---
@@ -120,22 +120,26 @@ The reasoning should be concise, limited to 2-3 sentences.
 if not API_KEY:
     raise ValueError("Set TWINVOICE_TWIN_API_KEY or OPENAI_API_KEY before running this script.")
 client = OpenAI(base_url=BASE_URL, api_key=API_KEY)
+# The ranking judge uses the judge endpoint when one is configured
+# (TWINVOICE_JUDGE_BASE_URL / TWINVOICE_JUDGE_API_KEY), otherwise the twin endpoint.
+judge_client = OpenAI(base_url=judge_base_url, api_key=judge_api_key) if judge_api_key else client
 
 
-def call_llm_api_with_retry(model, messages, temperature=0.0, max_tokens=None):
+def call_llm_api_with_retry(model, messages, temperature=0.0, max_tokens=None, api_client=None):
     """
     Call LLM API with integrated retry logic.
     """
+    api_client = api_client or client
     for attempt in range(MAX_RETRIES):
         try:
-            response = client.chat.completions.create(
+            response = api_client.chat.completions.create(
                 model=model,
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,  # Pass parameter to API call
                 timeout=60
             )
-            return response.choices[0].message.content.strip()
+            return (response.choices[0].message.content or "").strip()
         except Exception as e:
             print(f"  [Warning] API call failed on attempt {attempt + 1}/{MAX_RETRIES}. Error: {e}")
             if attempt < MAX_RETRIES - 1:
@@ -279,7 +283,7 @@ def step2_judge_similarity(sample):
     
     # 5. Call API and parse result
     messages = [{"role": "user", "content": prompt}]
-    judge_response_text = call_llm_api_with_retry(JUDGE_MODEL, messages, temperature=0.0)
+    judge_response_text = call_llm_api_with_retry(JUDGE_MODEL, messages, temperature=0.0, api_client=judge_client)
     
     # 6. Record judgment result
     sample['judge_prompt'] = prompt # Save prompt for debugging
@@ -292,12 +296,13 @@ def step2_judge_similarity(sample):
 
     parsed_json = parse_json_from_response(judge_response_text)
     
-    if parsed_json and 'choice' in parsed_json and 'reasoning' in parsed_json:
-        judge_choice_letter = parsed_json['choice'].upper()
+    # Only the choice is needed for the metric; the reasoning is optional.
+    if isinstance(parsed_json, dict) and isinstance(parsed_json.get('choice'), str):
+        judge_choice_letter = parsed_json['choice'].strip().upper()
         
         sample['step2_status'] = 'Success'
         sample['judge_choice_letter'] = judge_choice_letter
-        sample['judge_reasoning'] = parsed_json['reasoning']
+        sample['judge_reasoning'] = parsed_json.get('reasoning', '')
         
         # Check if judge's choice is valid
         if judge_choice_letter in candidate_map:
@@ -347,7 +352,10 @@ if __name__ == "__main__":
     
     ##Need to modify to adapt to different tracks
     # Dynamically generate filename based on model and data range - may need to include track information
-    file_suffix = f"lmut-{LMUT_MODEL}_judge-{JUDGE_MODEL}_range-{DATA_RANGE_START}-{DATA_RANGE_END}.jsonl"
+    # A model id may contain "/", which is not valid in a file name.
+    safe_lmut = re.sub(r"[^A-Za-z0-9_.-]+", "_", LMUT_MODEL)
+    safe_judge = re.sub(r"[^A-Za-z0-9_.-]+", "_", JUDGE_MODEL)
+    file_suffix = f"lmut-{safe_lmut}_judge-{safe_judge}_range-{DATA_RANGE_START}-{DATA_RANGE_END}.jsonl"
     step1_output_path = os.path.join(output_dir, f"step1_generations_{file_suffix}")
     step2_output_path = os.path.join(output_dir, f"step2_judgements_{file_suffix}")
 

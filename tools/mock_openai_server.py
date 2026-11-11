@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
@@ -92,7 +93,12 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
 
-    server = ThreadingHTTPServer((args.host, args.port), Handler)
+    class Server(ThreadingHTTPServer):
+        # On Windows SO_REUSEADDR lets a second server bind a port that is
+        # already in use, so a stale mock could answer the smoke test.
+        allow_reuse_address = os.name != "nt"
+
+    server = Server((args.host, args.port), Handler)
     print(f"Mock OpenAI server listening on http://{args.host}:{args.port}/v1", flush=True)
     server.serve_forever()
 

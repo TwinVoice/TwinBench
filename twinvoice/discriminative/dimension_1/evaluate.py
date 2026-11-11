@@ -138,7 +138,7 @@ def evaluate_mcq(
         rows = rows[:sample_n]
         print(f"Sampled {sample_n} entries for evaluation")
 
-    total = correct = 0
+    total = correct = api_failed = 0
     results: list[dict] = []
     wrongs: list[dict] = []
 
@@ -187,6 +187,7 @@ def evaluate_mcq(
             print("safe exit")
             break
         except Exception as exc:
+            api_failed += 1
             print(f"API Error: {exc}")
             time.sleep(1)
             continue
@@ -220,6 +221,8 @@ def evaluate_mcq(
     print(f"Total Items Evaluated: {total}")
     print(f"Correct Answers: {correct}")
     print(f"Accuracy: {accuracy:.2f}%")
+    if api_failed:
+        print(f"Entries skipped after API errors: {api_failed}")
 
     if wrongs:
         print(f"\nIncorrect Answers: {len(wrongs)} / {total}")

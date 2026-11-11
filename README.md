@@ -293,13 +293,26 @@ For deeper analysis, first ask the model to generate a persona-consistent reply,
 then use an LLM judge to map or score the generated reply against the reference.
 This mode costs more tokens but gives richer failure analysis.
 
+The judge scripts read their endpoint from `TWINVOICE_JUDGE_BASE_URL` and
+`TWINVOICE_JUDGE_API_KEY`, falling back to `OPENAI_BASE_URL` and
+`OPENAI_API_KEY`. Set them when the judge is served from a different endpoint
+than the model under test.
+
 Dimension 1 generation with the ranking judge (Acc.(Gen)), then similarity
 scoring (Score(Gen)):
 
 ```bash
-python -m twinvoice.generative.Dimension_1.gen_step1   --gen_model MODEL_NAME   --judge_model JUDGE_MODEL   --out_dir result/generative/dimension_1   --sample 20   --workers 4
+python -m twinvoice.generative.Dimension_1.gen_step1 \
+  --gen_model MODEL_NAME \
+  --judge_model JUDGE_MODEL \
+  --out_dir result/generative/dimension_1 \
+  --sample 20 \
+  --workers 4
 
-python -m twinvoice.generative.Dimension_1.judge_step2   --input result/generative/dimension_1/step1_generations_*.jsonl   --judge_model JUDGE_MODEL   --workers 4
+python -m twinvoice.generative.Dimension_1.judge_step2 \
+  --input result/generative/dimension_1/step1_generations_lmut-MODEL_NAME_judge-JUDGE_MODEL_range-1-20.jsonl \
+  --judge_model JUDGE_MODEL \
+  --workers 4
 ```
 
 Dimension 3 generation:
@@ -323,7 +336,7 @@ Dimension 3 judging:
 
 ```bash
 python -m twinvoice.generative.Dimension_3.judge_step2 \
-  --input result/generative/dimension_3/step1_generations_*.jsonl \
+  --input result/generative/dimension_3/step1_generations_lmut-MODEL_NAME_choices.jsonl \
   --judge_model JUDGE_MODEL \
   --workers 4
 ```

@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from openai import OpenAI
 import sys
-sys.path.append(str(Path(__file__).parent.parent.parent))
+sys.path.append(str(Path(__file__).resolve().parents[3]))
 from twinvoice.api_config import judge_base_url, judge_api_key
 
 # ================== API Configuration ==================
@@ -176,10 +176,15 @@ def judger1_map(sample, judge_model, max_tokens=10):
     )
     resp = call_llm(judge_model, [{"role":"user","content":prompt}], temperature=0.0, max_tokens=max_tokens)
 
-    guess = (resp or "").strip().upper()
-    if guess not in "ABCD":
-        m = re.search(r'\b([ABCD])\b', guess)
-        guess = m.group(1) if m else None
+    raw_answer = (resp or "").strip()
+    if raw_answer.startswith('{"error"'):
+        # API failure: the error text must not be searched for a letter.
+        guess = None
+    else:
+        guess = raw_answer.upper()
+        if guess not in ("A", "B", "C", "D"):
+            m = re.search(r'\b([ABCD])\b', guess)
+            guess = m.group(1) if m else None
 
     sample["mapped_choice"] = guess
     sample["gold_letter"] = gold_letter
@@ -249,7 +254,9 @@ def main():
 
     out_dir = in_path.parent
     base = in_path.with_suffix("").name
-    out_path = out_dir / f"Score_and_Map_on_{base}_by_{args.judge_model}.jsonl"
+    # A model id may contain "/", which is not valid in a file name.
+    safe_judge = re.sub(r"[^A-Za-z0-9_.-]+", "_", args.judge_model)
+    out_path = out_dir / f"Score_and_Map_on_{base}_by_{safe_judge}.jsonl"
 
     # Load samples.
     samples = []
@@ -320,7 +327,7 @@ def main():
         # Example cases
         f.write("=== Example Cases ===\n\n")
         # High scores (4-5)
-        high_scores = [r for r in final_results if r.get("score_gen_1to5", 0) >= 4][:2]
+        high_scores = [r for r in final_results if (r.get("score_gen_1to5") or 0) >= 4][:2]
         if high_scores:
             f.write("High Score Examples:\n")
             for case in high_scores:
@@ -328,7 +335,7 @@ def main():
                 f.write(f"Generated: {case.get('lmut_reply', '')[:100]}...\n\n")
         
         # Low scores (1-2)
-        low_scores = [r for r in final_results if r.get("score_gen_1to5", 0) <= 2][:2]
+        low_scores = [r for r in final_results if 1 <= (r.get("score_gen_1to5") or 0) <= 2][:2]
         if low_scores:
             f.write("Low Score Examples:\n")
             for case in low_scores:
